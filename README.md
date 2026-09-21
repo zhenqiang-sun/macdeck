@@ -74,8 +74,9 @@ Download the latest `MacDeck-v1.x.x.dmg` from [GitHub Releases](https://github.c
 > xattr -cr /Applications/MacDeck.app
 > ```
 
-### Method 2: Homebrew Cask (Coming Soon)
+### Method 2: Homebrew Cask
 ```bash
+brew tap zhenqiang-sun/tap
 brew install --cask macdeck
 ```
 

@@ -74,8 +74,9 @@
 > xattr -cr /Applications/MacDeck.app
 > ```
 
-### 方式二：Homebrew Cask 一键安装（即将支持）
+### 方式二：Homebrew Cask 一键安装
 ```bash
+brew tap zhenqiang-sun/tap
 brew install --cask macdeck
 ```
 

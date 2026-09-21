@@ -1,0 +1,35 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# Swift Package Manager & Xcode
+.build/
+Packages/
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+.swiftpm/
+
+# MacDeck Builds & Artifacts
+WindowAssistant.app
+MacDeck.app
+*.dmg
+*.app.zip
+*.app.tar.gz
+
+# Logs & Temporary Scratch Files
+*.log
+*.out
+.*_out.txt
+.t*_out.txt
+*.tmp
+
+# Environment & Private Configs
+.env
+.env.local
+
+# Internal Development Specs & Plans
+docs/superpowers/

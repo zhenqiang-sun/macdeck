@@ -50,7 +50,7 @@ swift test
    ```bash
    swift test
    ```
-4. Push to your branch and open a Pull Request against `master`.
+4. Push to your branch and open a Pull Request against `main`.
 
 ---
 

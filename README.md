@@ -6,13 +6,14 @@
 
 **The Native Multi-Display Window Restorer, Apple Silicon Dossier & Developer Toolkit for macOS**
 
+[![Website](https://img.shields.io/badge/website-macdeck--app.vercel.app-0070f3?logo=vercel&logoColor=white)](https://macdeck-app.vercel.app/)
 [![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-blue?logo=apple)](https://apple.com/macos)
 [![Swift](https://img.shields.io/badge/Swift-6.0%20%7C%20SwiftUI-orange?logo=swift)](https://swift.org)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%20v3-green.svg)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20(Pure%20Native)-purple)](Package.swift)
 [![Architecture](https://img.shields.io/badge/arch-Apple%20Silicon%20%7C%20Intel-success)](#)
 
-[English](README.md) • [简体中文](README_CN.md)
+[English](README.md) • [简体中文](README_CN.md) • [🌐 Website](https://macdeck-app.vercel.app/)
 
 <br/>
 

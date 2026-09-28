@@ -5,7 +5,7 @@ cask "macdeck" do
   url "https://github.com/zhenqiang-sun/macdeck/releases/download/v#{version}/MacDeck-#{version}.dmg"
   name "MacDeck"
   desc "Native multi-display window restorer & developer environment toolkit"
-  homepage "https://github.com/zhenqiang-sun/macdeck"
+  homepage "https://macdeck-app.vercel.app/"
 
   livecheck do
     url :url

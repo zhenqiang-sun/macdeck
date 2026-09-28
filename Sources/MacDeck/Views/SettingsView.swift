@@ -210,6 +210,32 @@ struct SettingsView: View {
                     }
 
                     Spacer()
+
+                    HStack(spacing: 8) {
+                        Button(action: {
+                            if let url = URL(string: "https://macdeck-app.vercel.app") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "safari")
+                                Text(loc.effectiveLanguage == .zhHans ? "官方网站" : "Website")
+                            }
+                        }
+                        .deckCompactButton(isProminent: false)
+
+                        Button(action: {
+                            if let url = URL(string: "https://github.com/zhenqiang-sun/macdeck") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "star")
+                                Text("GitHub")
+                            }
+                        }
+                        .deckCompactButton(isProminent: false)
+                    }
                 }
                 .padding(.vertical, 4)
             }

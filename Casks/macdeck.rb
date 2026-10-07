@@ -1,11 +1,11 @@
 cask "macdeck" do
   version "1.2.0"
-  sha256 "813d4802332b738bbb319cecc6bb88bd41f01b9c84f47e66fdcd842e4faf6fbf"
+  sha256 "e48c1d89b00f63fdeebbf5d40a245e9c826da844b769f6b7bd8b2ae2c322af72"
 
   url "https://github.com/zhenqiang-sun/macdeck/releases/download/v#{version}/MacDeck-#{version}.dmg"
   name "MacDeck"
   desc "Native multi-display window restorer & developer environment toolkit"
-  homepage "https://macdeck-app.vercel.app/"
+  homepage "https://macdeck-app.vercel.app"
 
   livecheck do
     url :url

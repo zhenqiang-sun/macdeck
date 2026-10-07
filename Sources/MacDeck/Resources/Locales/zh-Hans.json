@@ -419,7 +419,8 @@
     "license": "开源协议：GNU GPL v3.0",
     "github_repo": "GitHub 项目仓库",
     "language_zh_hant": "繁体中文",
-    "language_ja": "日本語"
+    "language_ja": "日本語",
+    "website": "官方网站"
   },
   "permission": {
     "banner_title": "需要开启辅助功能权限",
@@ -428,5 +429,9 @@
     "accessibility_title": "需要辅助功能权限",
     "accessibility_desc": "MacDeck 需要辅助功能权限以检测窗口坐标并执行布局还原。请前往系统设置 > 隐私与安全性 > 辅助功能进行授权。",
     "open_settings_button": "打开系统设置"
+  },
+  "about": {
+    "app_description": "macOS 多屏窗口记忆、外接拓扑归位与开发者环境维护套件",
+    "website": "官方网站"
   }
 }

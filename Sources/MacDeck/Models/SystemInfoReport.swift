@@ -299,27 +299,29 @@ public struct SystemInfoReport: Equatable, Codable {
     }
 
     public static func formatUptime(seconds: TimeInterval) -> String {
-        let isZh = LocalizationService.shared.effectiveLanguage == .zhHans
+        let lang = LocalizationService.shared.effectiveLanguage
         let totalSeconds = Int(seconds)
         let days = totalSeconds / 86400
         let hours = (totalSeconds % 86400) / 3600
         let minutes = (totalSeconds % 3600) / 60
-        if isZh {
-            if days > 0 {
-                return "\(days)天 \(hours)小时 \(minutes)分钟"
-            } else if hours > 0 {
-                return "\(hours)小时 \(minutes)分钟"
-            } else {
-                return "\(minutes)分钟"
-            }
-        } else {
-            if days > 0 {
-                return "\(days)d \(hours)h \(minutes)m"
-            } else if hours > 0 {
-                return "\(hours)h \(minutes)m"
-            } else {
-                return "\(minutes)m"
-            }
+
+        switch lang {
+        case .zhHans:
+            if days > 0 { return "\(days)天 \(hours)小时 \(minutes)分钟" }
+            if hours > 0 { return "\(hours)小时 \(minutes)分钟" }
+            return "\(minutes)分钟"
+        case .zhHant:
+            if days > 0 { return "\(days)天 \(hours)小時 \(minutes)分鐘" }
+            if hours > 0 { return "\(hours)小時 \(minutes)分鐘" }
+            return "\(minutes)分鐘"
+        case .ja:
+            if days > 0 { return "\(days)日 \(hours)時間 \(minutes)分" }
+            if hours > 0 { return "\(hours)時間 \(minutes)分" }
+            return "\(minutes)分"
+        case .en, .system:
+            if days > 0 { return "\(days)d \(hours)h \(minutes)m" }
+            if hours > 0 { return "\(hours)h \(minutes)m" }
+            return "\(minutes)m"
         }
     }
 }

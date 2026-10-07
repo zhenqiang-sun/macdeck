@@ -414,12 +414,13 @@
     "config_path_section": "數据与配置",
     "config_path_label": "配置文件存储路径:",
     "about_section": "關于 MacDeck",
-    "app_description": "macOS 多螢視窗記忆、外接拓撲歸位与開發者環境維護套件",
+    "app_description": "macOS 多螢幕視窗記憶、外接拓撲歸位與開發者環境維護套件",
     "version": "当前版本",
     "license": "開源协议：GNU GPL v3.0",
     "github_repo": "GitHub 項目仓库",
     "language_zh_hant": "繁體中文",
-    "language_ja": "日本語"
+    "language_ja": "日本語",
+    "website": "官方網站"
   },
   "permission": {
     "banner_title": "需要開啟輔助使用權限",
@@ -428,5 +429,9 @@
     "accessibility_title": "需要輔助使用權限",
     "accessibility_desc": "MacDeck 需要輔助使用權限以檢測視窗座標並執行佈局還原。請前往系統設定 > 隱私權與安全性 > 輔助使用進行授權。",
     "open_settings_button": "開啟系統設定"
+  },
+  "about": {
+    "app_description": "macOS 多螢幕視窗記憶、外接拓撲歸位與開發者環境維護套件",
+    "website": "官方網站"
   }
 }

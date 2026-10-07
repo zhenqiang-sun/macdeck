@@ -40,12 +40,12 @@ struct SettingsView: View {
                 .pickerStyle(.menu)
             }
 
-            Section(header: Text(loc.effectiveLanguage == .zhHans ? "归位与感知行为" : "Restoration & Sensor Behavior").font(.system(size: 13, weight: .semibold))) {
-                Toggle(loc.effectiveLanguage == .zhHans ? "检测到屏幕拓扑匹配时自动一键归位" : "Auto-restore windows when display topology matches", isOn: Binding(
+            Section(header: Text("settings.restoration_section".localized).font(.system(size: 13, weight: .semibold))) {
+                Toggle("settings.auto_restore_on_match".localized, isOn: Binding(
                     get: { state.autoRestoreOnProfileMatch },
                     set: { state.updateAutoRestoreOnProfileMatch($0) }
                 ))
-                Text(loc.effectiveLanguage == .zhHans ? "开启后，当插拔外接显示器且屏幕硬件组合匹配到已有方案时，系统将在拓扑稳定 1.0 秒后自动执行窗口归位。" : "Automatically restores windows 1.0s after display topology stabilizes upon connecting/disconnecting monitors.")
+                Text("settings.auto_restore_desc".localized)
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
 
@@ -58,20 +58,20 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
             }
 
-            Section(header: Text("软件与环境更新").font(.system(size: 13, weight: .semibold))) {
-                Toggle("后台自动检查更新", isOn: $autoCheckEnabled)
+            Section(header: Text("settings.software_update_section".localized).font(.system(size: 13, weight: .semibold))) {
+                Toggle("settings.auto_check_updates".localized, isOn: $autoCheckEnabled)
                     .onChange(of: autoCheckEnabled) { newValue in
                         UpdateSettingsStore.shared.setAutoCheckEnabled(newValue)
                     }
-                Text("开启后，MacDeck 会在启动后及周期性静默检测可用软件更新，并通过侧边栏角标提醒。")
+                Text("settings.auto_check_desc".localized)
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
 
                 if autoCheckEnabled {
-                    Picker("检查频率", selection: $checkIntervalHours) {
-                        Text("每 12 小时").tag(12)
-                        Text("每 24 小时 (推荐)").tag(24)
-                        Text("每 48 小时").tag(48)
+                    Picker("settings.check_interval".localized, selection: $checkIntervalHours) {
+                        Text("settings.every_12_hours".localized).tag(12)
+                        Text("settings.every_24_hours".localized).tag(24)
+                        Text("settings.every_48_hours".localized).tag(48)
                     }
                     .pickerStyle(.menu)
                     .onChange(of: checkIntervalHours) { newValue in
@@ -80,7 +80,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section(header: Text("快捷键指南").font(.system(size: 13, weight: .semibold))) {
+            Section(header: Text("settings.shortcuts_section".localized).font(.system(size: 13, weight: .semibold))) {
                 HStack {
                     HStack(spacing: 4) {
                         KeycapBadge(text: "⌘")
@@ -90,7 +90,7 @@ struct SettingsView: View {
                         KeycapBadge(text: "Return")
                     }
                     Spacer()
-                    Text("触发全部窗口一键归位")
+                    Text("settings.shortcut_restore_all".localized)
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
@@ -104,7 +104,7 @@ struct SettingsView: View {
                         KeycapBadge(text: "S")
                     }
                     Spacer()
-                    Text("快照保存当前所有窗口布局至当前方案")
+                    Text("settings.shortcut_snapshot".localized)
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
@@ -118,15 +118,15 @@ struct SettingsView: View {
                         KeycapBadge(text: "Q")
                     }
                     Spacer()
-                    Text("退出 MacDeck")
+                    Text("settings.shortcut_quit".localized)
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
             }
 
-            Section(header: Text("数据与配置").font(.system(size: 13, weight: .semibold))) {
+            Section(header: Text("settings.config_path_section".localized).font(.system(size: 13, weight: .semibold))) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("配置文件存储路径:")
+                    Text("settings.config_path_label".localized)
                         .font(.system(size: 12))
 
                     HStack {
@@ -151,12 +151,12 @@ struct SettingsView: View {
                         }) {
                             HStack(spacing: 4) {
                                 Image(systemName: copiedPath ? "checkmark" : "doc.on.doc")
-                                Text(copiedPath ? "已复制" : "复制路径")
+                                Text(copiedPath ? "common.copied".localized : "common.copy_path".localized)
                             }
                         }
                         .deckCompactButton(isProminent: false)
 
-                        Button("在访达中显示") {
+                        Button("common.open_in_finder".localized) {
                             let dirPath = NSString(string: "~/.config/macdeck").expandingTildeInPath
                             let filePath = (dirPath as NSString).appendingPathComponent("layouts.json")
                             let fm = FileManager.default
@@ -205,7 +205,7 @@ struct SettingsView: View {
                                 .background(DeckTheme.Colors.accentMuted)
                                 .cornerRadius(DeckTheme.CornerRadius.badge)
                         }
-                        Text(L10n.t("about.app_description"))
+                        Text("settings.app_description".localized)
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }
@@ -220,7 +220,7 @@ struct SettingsView: View {
                         }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "safari")
-                                Text(loc.effectiveLanguage == .zhHans ? "官方网站" : "Website")
+                                Text("settings.website".localized)
                             }
                         }
                         .deckCompactButton(isProminent: false)

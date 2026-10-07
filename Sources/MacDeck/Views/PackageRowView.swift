@@ -74,7 +74,7 @@ struct PackageRowView: View {
                             .foregroundColor(item.isIgnored ? .secondary : DeckTheme.Colors.success)
 
                         if item.isMajorUpdate {
-                            Text("Major")
+                            Text("update.major_badge".localized)
                                 .font(.system(size: 9, weight: .bold))
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 1.5)

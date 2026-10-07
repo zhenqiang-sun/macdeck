@@ -414,12 +414,13 @@
     "config_path_section": "Data & Configuration",
     "config_path_label": "Configuration File Path:",
     "about_section": "MacDeck について",
-    "app_description": "Native macOS multi-display window restoration & developer environment toolset",
+    "app_description": "macOS マルチディスプレイ ウィンドウ復元・外部トポロジ配置および開発者環境診断ツール",
     "version": "バージョン",
     "license": "License: GNU GPL v3.0",
     "github_repo": "GitHub Repository",
     "language_zh_hant": "繁體中文",
-    "language_ja": "日本語"
+    "language_ja": "日本語",
+    "website": "公式サイト"
   },
   "permission": {
     "banner_title": "アクセシビリティ権限が必要です",
@@ -428,5 +429,9 @@
     "accessibility_title": "アクセシビリティ権限が必要です",
     "accessibility_desc": "MacDeck はウィンドウ座標の検出とレイアウト復元のためにアクセシビリティ権限を必要とします。システム設定 > プライバシーとセキュリティ > アクセシビリティで許可してください。",
     "open_settings_button": "システム設定を開く"
+  },
+  "about": {
+    "app_description": "macOS マルチディスプレイ ウィンドウ復元・外部トポロジ配置および開発者環境診断ツール",
+    "website": "公式サイト"
   }
 }

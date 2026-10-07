@@ -419,7 +419,8 @@
     "license": "License: GNU GPL v3.0",
     "github_repo": "GitHub Repository",
     "language_zh_hant": "Traditional Chinese",
-    "language_ja": "Japanese"
+    "language_ja": "Japanese",
+    "website": "Website"
   },
   "permission": {
     "banner_title": "Accessibility Permission Required",
@@ -428,5 +429,9 @@
     "accessibility_title": "Accessibility Permission Required",
     "accessibility_desc": "MacDeck requires Accessibility permissions to detect window coordinates and restore layouts. Please grant access in System Settings > Privacy & Security > Accessibility.",
     "open_settings_button": "Open System Settings"
+  },
+  "about": {
+    "app_description": "Native macOS multi-display window restoration & developer environment toolset",
+    "website": "Website"
   }
 }

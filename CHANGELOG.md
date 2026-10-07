@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2026-10-07
+
+### Added
+- **Expanded Internationalization (i18n)**:
+  - Added native **繁體中文 (`zh-Hant`)** and **日本語 (`ja`)** language packages with 100% 1:1 key parity (403 keys across all 4 locales).
+  - Dynamic runtime language switching in Preferences supporting System Follow, English, 简体中文, 繁體中文, and 日本語.
+  - Comprehensive unit test assertions validating parity and real-time formatting across all 4 language dictionaries.
+- **Hardware Dossier Multi-Tier Cache & Instant Launch**:
+  - Implemented persistent TTL and in-memory caching (`SystemDossierCache`) for static hardware specifications (CPU core layout, Apple Silicon GPU/NPU specs, battery design capacity, board IDs).
+  - Eliminates cold-start freezing: System Dossier tab now loads instantly with background asynchronous cache refresh.
+- **Enhanced Multi-Source Package Hub & Safety Audit**:
+  - **In-Place Package State Transitions**: Upgrading packages dynamically update their row state and version tags immediately without full-list redraw glitches or button state mismatch.
+  - **Batch Upgrade Live Streaming**: Consolidated terminal drawer logs with step-by-step progress tracking across Homebrew, npm, Cargo, Volta, and Pipx.
+  - **Visual Safety Indicators**: Clear UI cues and context menus for pinned packages and ignored version updates.
+- **Visual Polish & AppKit Synergy**:
+  - Refined layout paddings, badge typography, and dark/light mode accent colors across all viewports.
+
+---
+
 ## [1.1.0] - 2026-09-21
 
 ### Added

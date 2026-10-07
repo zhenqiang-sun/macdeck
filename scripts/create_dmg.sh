@@ -5,7 +5,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_DIR"
 
 APP_PATH="$PROJECT_DIR/MacDeck.app"
-VERSION="1.1.0"
+VERSION="1.2.0"
 DMG_NAME="MacDeck-${VERSION}.dmg"
 STAGING_DIR="$PROJECT_DIR/.dmg_staging"
 

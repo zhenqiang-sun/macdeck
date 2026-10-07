@@ -7,7 +7,7 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(LocalizationService.resolveEffectiveLanguage(from: .zhHans), .zhHans)
         
         let systemEffective = LocalizationService.resolveEffectiveLanguage(from: .system)
-        XCTAssertTrue(systemEffective == .en || systemEffective == .zhHans)
+        XCTAssertTrue([.en, .zhHans, .zhHant, .ja].contains(systemEffective))
     }
 
     func testDictionaryKeysAreConsistent() {
@@ -21,13 +21,23 @@ final class LocalizationTests: XCTestCase {
         let enUptime = L10n.t("sysinfo.uptime")
         XCTAssertEqual(enUptime, "System Uptime")
         
-        // 切换为中文测试
+        // 切换为简体中文测试
         loc.setLanguage(.zhHans)
         let zhDisplays = L10n.t("nav.displays")
         XCTAssertEqual(zhDisplays, "多屏拓扑")
         
         let zhUptime = L10n.t("sysinfo.uptime")
         XCTAssertEqual(zhUptime, "系统运行时间")
+
+        // 切换为繁体中文测试
+        loc.setLanguage(.zhHant)
+        let zhtDisplays = L10n.t("nav.displays")
+        XCTAssertEqual(zhtDisplays, "多螢拓撲")
+
+        // 切换为日语测试
+        loc.setLanguage(.ja)
+        let jaDisplays = L10n.t("nav.displays")
+        XCTAssertEqual(jaDisplays, "マルチディスプレイ")
     }
 
     func testFormattedStringInterpolation() {
@@ -40,6 +50,14 @@ final class LocalizationTests: XCTestCase {
         loc.setLanguage(.zhHans)
         let zhCount = L10n.t("displays.displays_count", 3)
         XCTAssertEqual(zhCount, "3 台显示器")
+
+        loc.setLanguage(.zhHant)
+        let zhtCount = L10n.t("displays.displays_count", 3)
+        XCTAssertEqual(zhtCount, "3 台顯示器")
+
+        loc.setLanguage(.ja)
+        let jaCount = L10n.t("displays.displays_count", 3)
+        XCTAssertEqual(jaCount, "3 台のディスプレイ")
     }
 
     func testStringExtension() {
@@ -49,6 +67,12 @@ final class LocalizationTests: XCTestCase {
         
         loc.setLanguage(.zhHans)
         XCTAssertEqual("common.refresh".localized, "刷新")
+
+        loc.setLanguage(.zhHant)
+        XCTAssertEqual("common.refresh".localized, "刷新")
+
+        loc.setLanguage(.ja)
+        XCTAssertEqual("common.refresh".localized, "更新")
     }
 
     func testAllLanguagePacksHaveIdenticalKeys() throws {
@@ -78,14 +102,17 @@ final class LocalizationTests: XCTestCase {
             return flattenKeys(dict: json)
         }
 
+        let supportedCodes = ["en", "zh-Hans", "zh-Hant", "ja"]
         let enKeys = try loadKeys(code: "en")
-        let zhKeys = try loadKeys(code: "zh-Hans")
 
-        let missingInZh = enKeys.subtracting(zhKeys)
-        let missingInEn = zhKeys.subtracting(enKeys)
+        for code in supportedCodes where code != "en" {
+            let keys = try loadKeys(code: code)
+            let missingInTarget = enKeys.subtracting(keys)
+            let missingInEn = keys.subtracting(enKeys)
 
-        XCTAssertTrue(missingInZh.isEmpty, "Keys missing in zh-Hans.json: \(missingInZh)")
-        XCTAssertTrue(missingInEn.isEmpty, "Keys missing in en.json: \(missingInEn)")
-        XCTAssertEqual(enKeys, zhKeys, "Localization keys must match 1:1 between languages")
+            XCTAssertTrue(missingInTarget.isEmpty, "Keys missing in \(code).json: \(missingInTarget)")
+            XCTAssertTrue(missingInEn.isEmpty, "Keys missing in en.json when compared to \(code).json: \(missingInEn)")
+            XCTAssertEqual(enKeys, keys, "Localization keys must match 1:1 between en and \(code)")
+        }
     }
 }

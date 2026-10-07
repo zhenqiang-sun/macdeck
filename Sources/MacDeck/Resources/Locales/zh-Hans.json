@@ -417,11 +417,16 @@
     "app_description": "macOS 多屏窗口记忆、外接拓扑归位与开发者环境维护套件",
     "version": "当前版本",
     "license": "开源协议：GNU GPL v3.0",
-    "github_repo": "GitHub 项目仓库"
+    "github_repo": "GitHub 项目仓库",
+    "language_zh_hant": "繁体中文",
+    "language_ja": "日本語"
   },
   "permission": {
     "banner_title": "需要开启辅助功能权限",
-    "banner_desc": "MacDeck 需要通过系统的“辅助功能”权限获取窗口几何信息并在用户指令下调整窗口坐标。绝不记录键盘按键或截取屏幕内容。",
-    "grant_button": "前往系统设置授权"
+    "banner_desc": "MacDeck 需要通过系统的“辅助功能”权限获取窗口几何信息并在用户指令下调整窗口坐标。绝不监听键盘按键或屏幕内容。",
+    "grant_button": "前往系统设置授权",
+    "accessibility_title": "需要辅助功能权限",
+    "accessibility_desc": "MacDeck 需要辅助功能权限以检测窗口坐标并执行布局还原。请前往系统设置 > 隐私与安全性 > 辅助功能进行授权。",
+    "open_settings_button": "打开系统设置"
   }
 }

@@ -417,11 +417,16 @@
     "app_description": "Native macOS multi-display window restoration & developer environment toolset",
     "version": "Version",
     "license": "License: GNU GPL v3.0",
-    "github_repo": "GitHub Repository"
+    "github_repo": "GitHub Repository",
+    "language_zh_hant": "Traditional Chinese",
+    "language_ja": "Japanese"
   },
   "permission": {
     "banner_title": "Accessibility Permission Required",
     "banner_desc": "MacDeck requires macOS Accessibility permission to query and reposition window geometry across your displays. No keystrokes or screen contents are monitored.",
-    "grant_button": "Open System Settings"
+    "grant_button": "Open System Settings",
+    "accessibility_title": "Accessibility Permission Required",
+    "accessibility_desc": "MacDeck requires Accessibility permissions to detect window coordinates and restore layouts. Please grant access in System Settings > Privacy & Security > Accessibility.",
+    "open_settings_button": "Open System Settings"
   }
 }

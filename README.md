@@ -50,6 +50,7 @@ If you are a developer, designer, or power user who frequently connects/disconne
 
 ### 2. 📊 Apple Silicon Bento System Dossier
 - **Hardware Topology & UMA**: Displays Apple Silicon heterogenous core configurations (Performance vs. Efficiency cores), GPU cores, Neural Engine capability, cache sizes, and unified memory bandwidth.
+- **Instant Launch with Multi-Tier Cache**: Features high-speed in-memory & persistent TTL hardware caching for zero-latency instant display without blocking the main UI thread.
 - **Power & Battery Health**: Reports cycle counts, maximum capacity degradation, and external power source details.
 - **Clean APFS Storage Breakdown**: Accurately shows internal physical solid-state drives while filtering out false 100%-full SMB/NFS network shares and temporary disk images.
 - **Multi-Source Racing Public IP Probe**: Queries 6 global high-availability CDN nodes concurrently (`icanhazip`, `ident.me`, `ipinfo`, `ipip`, `ip.sb`) with zero UI freezing, completing in under 300ms.
@@ -60,7 +61,10 @@ If you are a developer, designer, or power user who frequently connects/disconne
 
 ### 4. 📦 Multi-Source Package Update Hub
 - **Aggregated CLI Package Management**: One-click detection for outdated packages across Homebrew, Cargo, npm global, Pipx, and Volta.
-- **Granular Control**: Supports version pinning, version ignoring, single/batch upgrades, and transaction rollback history.
+- **Granular Control & State Machine**: Supports version pinning, version ignoring, in-place live state transitions, single/batch upgrades with terminal drawer output, and transaction rollback history.
+
+### 5. 🌐 Comprehensive Multi-Language Localization (i18n)
+- **100% 1:1 Decoupled JSON Architecture**: Fully localized in **English**, **简体中文**, **繁體中文**, and **日本語** with hot runtime switching in Preferences and zero app restart needed.
 
 ---
 

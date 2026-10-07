@@ -7,6 +7,8 @@ public enum AppLanguage: String, CaseIterable, Identifiable, Codable {
     case system = "system"
     case en = "en"
     case zhHans = "zh-Hans"
+    case zhHant = "zh-Hant"
+    case ja = "ja"
 
     public var id: String { rawValue }
 
@@ -18,6 +20,10 @@ public enum AppLanguage: String, CaseIterable, Identifiable, Codable {
             return "English"
         case .zhHans:
             return "简体中文"
+        case .zhHant:
+            return "繁體中文"
+        case .ja:
+            return "日本語"
         }
     }
 }
@@ -35,7 +41,7 @@ public final class LocalizationService: ObservableObject {
         }
     }
 
-    /// 当前实际生效的语言 (en 或 zh-Hans)
+    /// 当前实际生效的语言 (en, zh-Hans, zh-Hant, ja)
     @Published public private(set) var effectiveLanguage: AppLanguage = .en
 
     private init() {
@@ -59,17 +65,27 @@ public final class LocalizationService: ObservableObject {
     }
 
     /// 判定实际生效语言：
-    /// 若设为 system，优先根据系统语言首选项判定；若系统为中文则返回 zhHans，其余全部默认返回 en。
+    /// 若设为 system，优先根据系统语言首选项判定；若系统为繁体中文则返回 zhHant，简体中文返回 zhHans，日语返回 ja，其余默认返回 en。
     public static func resolveEffectiveLanguage(from selection: AppLanguage) -> AppLanguage {
         switch selection {
         case .en:
             return .en
         case .zhHans:
             return .zhHans
+        case .zhHant:
+            return .zhHant
+        case .ja:
+            return .ja
         case .system:
             let preferred = Locale.preferredLanguages.first ?? ""
+            if preferred.hasPrefix("zh-Hant") || preferred.hasPrefix("zh-TW") || preferred.hasPrefix("zh-HK") || preferred.hasPrefix("zh-MO") {
+                return .zhHant
+            }
             if preferred.hasPrefix("zh") {
                 return .zhHans
+            }
+            if preferred.hasPrefix("ja") {
+                return .ja
             }
             return .en
         }
@@ -139,17 +155,34 @@ public final class LocalizationService: ObservableObject {
     }
 
     /// 本地化查询（优先外部语言包，若无则回退到内置字典）
+    /// 本地化查询（优先外部语言包，若无则回退到内置字典）
     public func localizedString(forKey key: String) -> String {
-        let code = (effectiveLanguage == .zhHans ? "zh-Hans" : "en")
+        let code: String
+        switch effectiveLanguage {
+        case .zhHans:
+            code = "zh-Hans"
+        case .zhHant:
+            code = "zh-Hant"
+        case .ja:
+            code = "ja"
+        case .en, .system:
+            code = "en"
+        }
+
         let pack = loadPackIfNeeded(languageCode: code)
         if let val = pack[key] {
             return val
         }
 
         // 回退机制
-        if effectiveLanguage == .zhHans {
+        switch effectiveLanguage {
+        case .zhHans:
             return Self.zhDictionary[key] ?? Self.enDictionary[key] ?? key
-        } else {
+        case .zhHant:
+            return Self.zhDictionary[key] ?? Self.enDictionary[key] ?? key
+        case .ja:
+            return Self.enDictionary[key] ?? key
+        case .en, .system:
             return Self.enDictionary[key] ?? Self.zhDictionary[key] ?? key
         }
     }
@@ -157,7 +190,18 @@ public final class LocalizationService: ObservableObject {
     /// 支持带格式化参数的本地化
     public func localizedString(forKey key: String, arguments: [CVarArg]) -> String {
         let format = localizedString(forKey: key)
-        return String(format: format, locale: (effectiveLanguage == .zhHans ? Locale(identifier: "zh-Hans") : Locale(identifier: "en")), arguments: arguments)
+        let localeIdentifier: String
+        switch effectiveLanguage {
+        case .zhHans:
+            localeIdentifier = "zh-Hans"
+        case .zhHant:
+            localeIdentifier = "zh-Hant"
+        case .ja:
+            localeIdentifier = "ja"
+        case .en, .system:
+            localeIdentifier = "en"
+        }
+        return String(format: format, locale: Locale(identifier: localeIdentifier), arguments: arguments)
     }
 
     // MARK: - 双语词典

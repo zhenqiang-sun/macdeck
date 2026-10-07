@@ -4,6 +4,9 @@ set -e
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_DIR"
 
+VERSION="$(tr -d '[:space:]' < "$PROJECT_DIR/VERSION")"
+echo "==> 构建 MacDeck 版本: v${VERSION}..."
+
 BIN_STAGING="$PROJECT_DIR/.build/bin_staging"
 mkdir -p "$BIN_STAGING"
 
@@ -59,7 +62,7 @@ cat <<EOF > "$CONTENTS/Info.plist"
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.2.0</string>
+    <string>$VERSION</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>NSHighResolutionCapable</key>

@@ -290,7 +290,7 @@ public final class SoftwareUpdateService: @unchecked Sendable {
                         cargoOutdated = await withTaskGroup(of: SoftwarePackageItem?.self) { group in
                             for pkg in installedCargo {
                                 group.addTask { [self] in
-                                    let crateJson = await self.executeShellCommand("curl -s --max-time 3 -H 'User-Agent: MacDeck/1.1.0' https://crates.io/api/v1/crates/\(pkg.rawName) 2>/dev/null", streamOutput: false)
+                                    let crateJson = await self.executeShellCommand("curl -s --max-time 3 -H 'User-Agent: MacDeck/1.2.0' https://crates.io/api/v1/crates/\(pkg.rawName) 2>/dev/null", streamOutput: false)
                                     if let data = crateJson.data(using: .utf8),
                                        let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                                        let cr = dict["crate"] as? [String: Any],

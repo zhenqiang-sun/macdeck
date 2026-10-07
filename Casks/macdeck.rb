@@ -1,6 +1,6 @@
 cask "macdeck" do
   version "1.2.0"
-  sha256 "0a5199020c00bdbcd81060d267ba29e9678e19dd2b3d9f05d20bbf17c451e410"
+  sha256 "813d4802332b738bbb319cecc6bb88bd41f01b9c84f47e66fdcd842e4faf6fbf"
 
   url "https://github.com/zhenqiang-sun/macdeck/releases/download/v#{version}/MacDeck-#{version}.dmg"
   name "MacDeck"

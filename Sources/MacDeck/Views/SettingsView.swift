@@ -188,7 +188,8 @@ struct SettingsView: View {
                         HStack(spacing: 6) {
                             Text("MacDeck")
                                 .font(.system(size: 13, weight: .bold))
-                            Text("v1.1.0")
+                            let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.0"
+                            Text("v\(appVersion)")
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundColor(.secondary)
                                 .padding(.horizontal, 5)
@@ -204,7 +205,7 @@ struct SettingsView: View {
                                 .background(DeckTheme.Colors.accentMuted)
                                 .cornerRadius(DeckTheme.CornerRadius.badge)
                         }
-                        Text(loc.effectiveLanguage == .zhHans ? "macOS 多屏窗口记忆、外接拓扑归位与开发者环境维护套件" : "Native macOS multi-display window restoration & developer environment toolset")
+                        Text(L10n.t("about.app_description"))
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }

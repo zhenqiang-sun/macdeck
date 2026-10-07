@@ -1,10 +1,18 @@
 import SwiftUI
-
+@MainActor
 struct SoftwareUpdateView: View {
-    @StateObject private var vm = SoftwareUpdateViewModel()
+    @ObservedObject private var vm: SoftwareUpdateViewModel
     @ObservedObject private var loc = LocalizationService.shared
 
     @State private var showClearHistoryAlert: Bool = false
+
+    init() {
+        self.vm = SoftwareUpdateViewModel()
+    }
+
+    init(viewModel: SoftwareUpdateViewModel) {
+        self.vm = viewModel
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,38 +32,66 @@ struct SoftwareUpdateView: View {
 
                     // Action Buttons (完整文字展示，杜绝截断，高度统一 30pt)
                     HStack(spacing: 8) {
-                        if vm.isUpgrading || vm.isChecking || vm.isUninstalling || vm.isScanningInstalled {
-                            Button("update.abort".localized, action: vm.cancel)
-                                .deckSecondaryButton(height: DeckTheme.ControlHeight.regular, cornerRadius: DeckTheme.CornerRadius.button, isDestructive: true)
-                        }
-
                         if vm.currentScope == .updates {
-                            Button(action: vm.checkUpdates) {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "arrow.clockwise")
-                                    Text("update.check_available".localized)
+                            if vm.isChecking {
+                                Button(action: vm.cancel) {
+                                    HStack(spacing: 5) {
+                                        ProgressView()
+                                            .controlSize(.mini)
+                                        Text("update.abort_check".localized)
+                                    }
                                 }
+                                .deckSecondaryButton(height: DeckTheme.ControlHeight.regular, cornerRadius: DeckTheme.CornerRadius.button, isDestructive: true)
+                            } else {
+                                Button(action: vm.checkUpdates) {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "arrow.clockwise")
+                                        Text("update.check_available".localized)
+                                    }
+                                }
+                                .deckSecondaryButton(height: DeckTheme.ControlHeight.regular, cornerRadius: DeckTheme.CornerRadius.button)
+                                .disabled(vm.isUpgrading)
                             }
-                            .deckSecondaryButton(height: DeckTheme.ControlHeight.regular, cornerRadius: DeckTheme.CornerRadius.button)
-                            .disabled(vm.isChecking || vm.isUpgrading)
 
-                            Button(action: vm.upgradeSelected) {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "bolt.fill")
-                                    Text(String(format: "update.upgrade_selected_count".localized, vm.selectedItemsCount))
+                            if vm.isUpgrading {
+                                Button(action: vm.cancel) {
+                                    HStack(spacing: 5) {
+                                        ProgressView()
+                                            .controlSize(.mini)
+                                        Text("update.abort_upgrade".localized)
+                                    }
                                 }
+                                .deckSecondaryButton(height: DeckTheme.ControlHeight.regular, cornerRadius: DeckTheme.CornerRadius.button, isDestructive: true)
+                            } else {
+                                Button(action: vm.upgradeSelected) {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "bolt.fill")
+                                        Text(String(format: "update.upgrade_selected_count".localized, vm.selectedItemsCount))
+                                    }
+                                }
+                                .deckPrimaryButton(height: DeckTheme.ControlHeight.regular, cornerRadius: DeckTheme.CornerRadius.button)
+                                .disabled(vm.selectedItemsCount == 0 || vm.isChecking)
                             }
-                            .deckPrimaryButton(height: DeckTheme.ControlHeight.regular, cornerRadius: DeckTheme.CornerRadius.button)
-                            .disabled(vm.selectedItemsCount == 0 || vm.isUpgrading || vm.isChecking)
                         } else if vm.currentScope == .installed {
-                            Button(action: vm.scanInstalled) {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "arrow.clockwise")
-                                    Text("update.rescan".localized)
+                            if vm.isScanningInstalled {
+                                Button(action: vm.cancel) {
+                                    HStack(spacing: 5) {
+                                        ProgressView()
+                                            .controlSize(.mini)
+                                        Text("update.abort_scan".localized)
+                                    }
                                 }
+                                .deckSecondaryButton(height: DeckTheme.ControlHeight.regular, cornerRadius: DeckTheme.CornerRadius.button, isDestructive: true)
+                            } else {
+                                Button(action: vm.scanInstalled) {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "arrow.clockwise")
+                                        Text("update.rescan".localized)
+                                    }
+                                }
+                                .deckSecondaryButton(height: DeckTheme.ControlHeight.regular, cornerRadius: DeckTheme.CornerRadius.button)
+                                .disabled(vm.isUninstalling)
                             }
-                            .deckSecondaryButton(height: DeckTheme.ControlHeight.regular, cornerRadius: DeckTheme.CornerRadius.button)
-                            .disabled(vm.isScanningInstalled)
                         } else if vm.currentScope == .history {
                             Menu {
                                 Button("update.export_json_file".localized) { exportHistoryToFile(format: "json") }
@@ -90,6 +126,16 @@ struct SoftwareUpdateView: View {
                             }
                             .deckSecondaryButton(height: DeckTheme.ControlHeight.regular, cornerRadius: DeckTheme.CornerRadius.button, isDestructive: true)
                             .disabled(vm.historyRecords.isEmpty)
+                            .alert(isPresented: $showClearHistoryAlert) {
+                                Alert(
+                                    title: Text("update.clear_history_alert_title".localized),
+                                    message: Text("update.clear_history_alert_desc".localized),
+                                    primaryButton: .destructive(Text("update.clear_history_confirm_action".localized)) {
+                                        vm.clearHistory()
+                                    },
+                                    secondaryButton: .cancel(Text("common.cancel".localized))
+                                )
+                            }
                         }
 
                         Button(action: vm.openLogFile) {
@@ -144,16 +190,6 @@ struct SoftwareUpdateView: View {
                 onClear: { vm.consoleLog = "" }
             )
         }
-        .alert(item: $vm.itemToUninstall) { item in
-            Alert(
-                title: Text(String(format: "update.confirm_uninstall_title".localized, item.displayName)),
-                message: Text(String(format: "update.confirm_uninstall_desc".localized, item.source.displayName, item.rawName)),
-                primaryButton: .destructive(Text("update.confirm_uninstall_action".localized)) {
-                    vm.confirmUninstall()
-                },
-                secondaryButton: .cancel(Text("common.cancel".localized))
-            )
-        }
         .alert(isPresented: $vm.showMajorConfirmAlert) {
             let names = vm.majorUpdateItems.map { "• \($0.displayName) (\($0.currentVersion) ➔ \($0.latestVersion))" }.joined(separator: "\n")
             return Alert(
@@ -162,17 +198,9 @@ struct SoftwareUpdateView: View {
                 primaryButton: .default(Text("update.continue_upgrade".localized)) {
                     vm.confirmMajorUpgrade()
                 },
-                secondaryButton: .cancel(Text("common.cancel".localized))
-            )
-        }
-        .alert(isPresented: $showClearHistoryAlert) {
-            Alert(
-                title: Text("update.clear_history_alert_title".localized),
-                message: Text("update.clear_history_alert_desc".localized),
-                primaryButton: .destructive(Text("update.clear_history_confirm_action".localized)) {
-                    vm.clearHistory()
-                },
-                secondaryButton: .cancel(Text("common.cancel".localized))
+                secondaryButton: .cancel(Text("common.cancel".localized)) {
+                    vm.cancelMajorUpgrade()
+                }
             )
         }
     }
@@ -184,16 +212,19 @@ struct SoftwareUpdateView: View {
                 // Category Pills (使用统一底板槽)
                 ScrollView(.horizontal, showsIndicators: false) {
                     DeckSegmentedContainer {
+                        let totalCount = vm.currentScope == .updates ? vm.pendingUpdateCount : vm.activeList.count
                         DeckSegmentedItem(
                             title: "common.all".localized,
-                            count: vm.activeList.count,
+                            count: totalCount,
                             isSelected: vm.selectedFilter == nil
                         ) {
                             vm.selectedFilter = nil
                         }
 
                         ForEach([PackageSource.brewCask, .brewFormula, .npmGlobal, .volta, .pipx, .cargo, .appStore], id: \.self) { src in
-                            let count = vm.activeList.filter { $0.source == src }.count
+                            let count = vm.activeList.filter {
+                                $0.source == src && (vm.currentScope != .updates || ($0.status != .upgraded && !$0.isIgnored && !$0.isPinned))
+                            }.count
                             if count > 0 || vm.selectedFilter == src {
                                 DeckSegmentedItem(
                                     title: src.displayName,
@@ -246,6 +277,7 @@ struct SoftwareUpdateView: View {
             if vm.currentScope == .updates && !vm.filteredItems.isEmpty {
                 Divider()
                 HStack(spacing: 10) {
+                    let selectableCount = vm.filteredItems.filter { $0.status != .upgraded && !$0.isIgnored && !$0.isPinned }.count
                     Toggle("", isOn: Binding(
                         get: { vm.allSelected },
                         set: { _ in vm.toggleSelectAll() }
@@ -253,8 +285,9 @@ struct SoftwareUpdateView: View {
                     .labelsHidden()
                     .toggleStyle(.checkbox)
                     .frame(width: 18)
+                    .disabled(selectableCount == 0)
 
-                    Text(vm.allSelected ? "update.deselect_all".localized : String(format: "update.select_all_with_count".localized, vm.filteredItems.count))
+                    Text(vm.allSelected ? "update.deselect_all".localized : String(format: "update.select_all_with_count".localized, selectableCount))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.secondary)
 
@@ -272,7 +305,39 @@ struct SoftwareUpdateView: View {
             Divider()
 
             // List Area
-            if vm.filteredItems.isEmpty {
+            if vm.isChecking {
+                VStack(spacing: 14) {
+                    Spacer()
+                    ProgressView()
+                        .controlSize(.regular)
+                    VStack(spacing: 6) {
+                        Text("update.checking_title".localized)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.primary)
+                        Text("update.checking_desc".localized)
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if vm.isScanningInstalled {
+                VStack(spacing: 14) {
+                    Spacer()
+                    ProgressView()
+                        .controlSize(.regular)
+                    VStack(spacing: 6) {
+                        Text("update.scanning_title".localized)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.primary)
+                        Text("update.scanning_desc".localized)
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if vm.filteredItems.isEmpty {
                 VStack(spacing: 12) {
                     Spacer()
                     Image(systemName: vm.activeList.isEmpty ? (vm.currentScope == .updates ? "arrow.clockwise.circle" : "shippingbox") : "magnifyingglass")
@@ -308,7 +373,10 @@ struct SoftwareUpdateView: View {
                                     item: $item,
                                     isUpdatesScope: vm.currentScope == .updates,
                                     onUpgrade: { vm.upgradeSingle(item: item) },
-                                    onUninstall: { vm.requestUninstall(item: item) }
+                                    onUninstall: { vm.requestUninstall(item: item) },
+                                    onTogglePin: { vm.togglePin(for: item) },
+                                    onToggleIgnore: { vm.toggleIgnore(for: item) },
+                                    onRemoveFromList: { vm.removeItemFromUpdatesList(for: item) }
                                 )
                                 Divider()
                                     .padding(.horizontal, 10)
@@ -320,6 +388,16 @@ struct SoftwareUpdateView: View {
                     .padding(.vertical, 8)
                 }
             }
+        }
+        .alert(item: $vm.itemToUninstall) { item in
+            Alert(
+                title: Text(String(format: "update.confirm_uninstall_title".localized, item.displayName)),
+                message: Text(String(format: "update.confirm_uninstall_desc".localized, item.source.displayName, item.rawName)),
+                primaryButton: .destructive(Text("update.confirm_uninstall_action".localized)) {
+                    vm.confirmUninstall()
+                },
+                secondaryButton: .cancel(Text("common.cancel".localized))
+            )
         }
     }
 
@@ -353,8 +431,24 @@ struct SoftwareUpdateView: View {
     private var headerSubtitle: String {
         switch vm.currentScope {
         case .updates:
-            return vm.items.isEmpty ? "update.subtitle_updates_empty".localized : String(format: "update.subtitle_updates_count".localized, vm.items.count)
+            if vm.isChecking {
+                return "update.checking".localized
+            }
+            if vm.isUpgrading {
+                return "update.upgrading_in_progress".localized
+            }
+            let pending = vm.pendingUpdateCount
+            if vm.items.isEmpty {
+                return "update.subtitle_updates_empty".localized
+            } else if pending == 0 {
+                return "update.no_updates_available".localized
+            } else {
+                return String(format: "update.subtitle_updates_count".localized, pending)
+            }
         case .installed:
+            if vm.isScanningInstalled {
+                return "update.scanning_in_progress".localized
+            }
             return vm.installedItems.isEmpty ? "update.subtitle_installed_empty".localized : String(format: "update.subtitle_installed_count".localized, vm.installedItems.count)
         case .history:
             return vm.historyRecords.isEmpty ? "update.subtitle_history_empty".localized : String(format: "update.subtitle_history_count".localized, vm.historyRecords.count)
@@ -364,7 +458,8 @@ struct SoftwareUpdateView: View {
     private func scopeTitle(for scope: ViewScope) -> String {
         switch scope {
         case .updates:
-            return vm.items.isEmpty ? "update.scope_updates".localized : "\("update.scope_updates".localized) (\(vm.items.count))"
+            let pending = vm.pendingUpdateCount
+            return pending == 0 ? "update.scope_updates".localized : "\("update.scope_updates".localized) (\(pending))"
         case .installed:
             return vm.installedItems.isEmpty ? "update.scope_installed".localized : "\("update.scope_installed".localized) (\(vm.installedItems.count))"
         case .history:

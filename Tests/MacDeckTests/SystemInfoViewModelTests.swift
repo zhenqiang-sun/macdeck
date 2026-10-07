@@ -7,13 +7,18 @@ import AppKit
 struct SystemInfoViewModelTests {
     @Test("ViewModel initial state and loadInfo")
     func testViewModelLoad() async {
-        let vm = SystemInfoViewModel()
+        let emptyCache = SystemInfoCacheStore(customURL: FileManager.default.temporaryDirectory.appendingPathComponent("sysinfo_test_\(UUID().uuidString).json"))
+        let vm = SystemInfoViewModel(cacheStore: emptyCache)
         #expect(vm.report == nil)
         #expect(!vm.isLoading)
 
         await vm.loadInfo()
         #expect(vm.report != nil)
         #expect(!vm.isLoading)
+
+        let cached = emptyCache.loadCachedReport()
+        #expect(cached != nil)
+        #expect(cached?.machineName == vm.report?.machineName)
     }
 
     @Test("ViewModel copyReport writes to pasteboard and shows feedback")

@@ -126,19 +126,28 @@ public final class SoftwareUpdateViewModel: ObservableObject {
         }
     }
 
+    public var pendingUpdateCount: Int {
+        items.filter { $0.status != .upgraded && !$0.isIgnored && !$0.isPinned }.count
+    }
+
     public var selectedItemsCount: Int {
-        filteredItems.filter { $0.isSelected }.count
+        filteredItems.filter { $0.isSelected && $0.status != .upgraded && !$0.isIgnored && !$0.isPinned }.count
     }
 
     public var allSelected: Bool {
-        !filteredItems.isEmpty && filteredItems.allSatisfy { $0.isSelected }
+        let selectable = filteredItems.filter { $0.status != .upgraded && !$0.isIgnored && !$0.isPinned }
+        return !selectable.isEmpty && selectable.allSatisfy { $0.isSelected }
     }
 
     public func toggleSelectAll() {
         let target = !allSelected
         for i in 0..<items.count {
             if selectedFilter == nil || items[i].source == selectedFilter {
-                items[i].isSelected = target
+                if items[i].status == .upgraded || items[i].isIgnored || items[i].isPinned {
+                    items[i].isSelected = false
+                } else {
+                    items[i].isSelected = target
+                }
             }
         }
     }
@@ -219,7 +228,7 @@ public final class SoftwareUpdateViewModel: ObservableObject {
 
     public func upgradeSelected() {
         guard !isUpgrading else { return }
-        let toUpgrade = items.filter { $0.isSelected && $0.status != .upgraded }
+        let toUpgrade = items.filter { $0.isSelected && !$0.isIgnored && !$0.isPinned && $0.status != .upgraded }
         guard !toUpgrade.isEmpty else { return }
 
         let majorItems = toUpgrade.filter { $0.isMajorUpdate }
@@ -238,6 +247,12 @@ public final class SoftwareUpdateViewModel: ObservableObject {
         pendingUpgradeItems = []
         majorUpdateItems = []
         executeUpgrade(items: toUpgrade)
+    }
+
+    public func cancelMajorUpgrade() {
+        showMajorConfirmAlert = false
+        pendingUpgradeItems = []
+        majorUpdateItems = []
     }
 
     private func executeUpgrade(items toUpgrade: [SoftwarePackageItem]) {
@@ -266,6 +281,10 @@ public final class SoftwareUpdateViewModel: ObservableObject {
 
                 let displayTitle = batches.count > 1 ? "[\(idx + 1)/\(batches.count)] \(baseTitle)" : baseTitle
 
+                await MainActor.run {
+                    self.statusMessage = "正在升级 \(displayTitle)..."
+                }
+
                 let success = await self.service.upgradeBatch(
                     command: batch.command,
                     displayTitle: displayTitle
@@ -281,13 +300,18 @@ public final class SoftwareUpdateViewModel: ObservableObject {
                     failureCount += batch.items.count
                 }
 
+                let failureReason = success ? "" : SoftwareUpdateService.diagnoseFailureReason(from: self.consoleLog)
                 for item in batch.items {
                     if let idx = self.items.firstIndex(where: { $0.id == item.id }) {
-                        self.items[idx].status = success ? .upgraded : .failed(message: "升级失败")
+                        self.items[idx].status = success ? .upgraded : .failed(message: failureReason)
+                        if success {
+                            self.items[idx].currentVersion = item.latestVersion
+                            self.items[idx].isSelected = false
+                        }
                     }
                     if let insIdx = self.installedItems.firstIndex(where: { $0.id == item.id }) {
                         self.installedItems[insIdx].currentVersion = item.latestVersion
-                        self.installedItems[insIdx].status = success ? .upgraded : .failed(message: "升级失败")
+                        self.installedItems[insIdx].status = success ? .upgraded : .failed(message: failureReason)
                     }
                 }
 
@@ -314,10 +338,26 @@ public final class SoftwareUpdateViewModel: ObservableObject {
             }
 
             self.isUpgrading = false
-            let remaining = self.items.filter { $0.status != .upgraded }.count
+            let remaining = self.pendingUpdateCount
             SoftwareUpdateBackgroundChecker.shared.updatePendingCount(remaining)
             self.statusMessage = failureCount == 0 ? "全部升级完成！(成功 \(successCount) 项)" : "升级结束：成功 \(successCount) 项，失败 \(failureCount) 项"
             self.sendCompletionNotification(successCount: successCount, failureCount: failureCount)
+
+            // 如果有成功升级的项，给用户 1.2 秒看到成功打勾反馈后，平滑淡出移出可升级列表
+            if successCount > 0 {
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    try? await Task.sleep(nanoseconds: 1_200_000_000)
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        self.items.removeAll { $0.status == .upgraded }
+                    }
+                    let left = self.pendingUpdateCount
+                    SoftwareUpdateBackgroundChecker.shared.updatePendingCount(left)
+                    if left == 0 {
+                        self.statusMessage = "🎉 所有软件与工具链已全部升级至最新！"
+                    }
+                }
+            }
         }
     }
 
@@ -384,5 +424,83 @@ public final class SoftwareUpdateViewModel: ObservableObject {
 
     public func openLogFile() {
         NSWorkspace.shared.selectFile(service.logFileURL.path, inFileViewerRootedAtPath: "")
+    }
+
+    // MARK: - Pin & Ignore Management
+
+    public func togglePin(for item: SoftwarePackageItem) {
+        if item.isPinned {
+            unpinPackage(for: item)
+        } else {
+            pinPackage(for: item)
+        }
+    }
+
+    public func pinPackage(for item: SoftwarePackageItem) {
+        UpdateSettingsStore.shared.pinPackage(rawName: item.rawName)
+        updateItemState(id: item.id) { pkg in
+            pkg.isPinned = true
+            pkg.isSelected = false
+        }
+        statusMessage = "已锁定 \(item.displayName)，后续不再提示更新。"
+    }
+
+    public func unpinPackage(for item: SoftwarePackageItem) {
+        UpdateSettingsStore.shared.unpin(rawName: item.rawName)
+        updateItemState(id: item.id) { pkg in
+            pkg.isPinned = false
+            if !pkg.isIgnored {
+                pkg.isSelected = true
+            }
+        }
+        statusMessage = "已解除 \(item.displayName) 的版本锁定。"
+    }
+
+    public func toggleIgnore(for item: SoftwarePackageItem) {
+        if item.isIgnored {
+            unignoreVersion(for: item)
+        } else {
+            ignoreVersion(for: item)
+        }
+    }
+
+    public func ignoreVersion(for item: SoftwarePackageItem) {
+        UpdateSettingsStore.shared.ignoreVersion(rawName: item.rawName, version: item.latestVersion)
+        updateItemState(id: item.id) { pkg in
+            pkg.isIgnored = true
+            pkg.isSelected = false
+        }
+        statusMessage = "已忽略 \(item.displayName) v\(item.latestVersion)，不再提示该版本更新。"
+    }
+
+    public func unignoreVersion(for item: SoftwarePackageItem) {
+        UpdateSettingsStore.shared.unignore(rawName: item.rawName)
+        updateItemState(id: item.id) { pkg in
+            pkg.isIgnored = false
+            if !pkg.isPinned {
+                pkg.isSelected = true
+            }
+        }
+        statusMessage = "已恢复 \(item.displayName) 的版本更新提醒。"
+    }
+
+    public func removeItemFromUpdatesList(for item: SoftwarePackageItem) {
+        withAnimation {
+            items.removeAll { $0.id == item.id }
+        }
+        let pendingCount = items.filter { !$0.isIgnored && !$0.isPinned && $0.status != .upgraded }.count
+        SoftwareUpdateBackgroundChecker.shared.updatePendingCount(pendingCount, items: items.filter { !$0.isIgnored && !$0.isPinned })
+        statusMessage = "已从本次待更新列表中移除 \(item.displayName)。"
+    }
+
+    private func updateItemState(id: String, mutate: (inout SoftwarePackageItem) -> Void) {
+        if let idx = items.firstIndex(where: { $0.id == id }) {
+            mutate(&items[idx])
+        }
+        if let idx = installedItems.firstIndex(where: { $0.id == id }) {
+            mutate(&installedItems[idx])
+        }
+        let pendingCount = items.filter { !$0.isIgnored && !$0.isPinned && $0.status != .upgraded }.count
+        SoftwareUpdateBackgroundChecker.shared.updatePendingCount(pendingCount, items: items.filter { !$0.isIgnored && !$0.isPinned })
     }
 }

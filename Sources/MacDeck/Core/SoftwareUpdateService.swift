@@ -49,9 +49,9 @@ public final class SoftwareUpdateService: @unchecked Sendable {
     public func buildUpgradeCommand(for item: SoftwarePackageItem) -> String {
         switch item.source {
         case .brewCask:
-            return "brew upgrade --cask \(item.rawName)"
+            return "HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 brew upgrade --cask \(item.rawName)"
         case .brewFormula:
-            return "brew upgrade \(item.rawName)"
+            return "HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 brew upgrade \(item.rawName)"
         case .npmGlobal:
             return "npm install -g \(item.rawName)@latest"
         case .appStore:
@@ -65,21 +65,39 @@ public final class SoftwareUpdateService: @unchecked Sendable {
         }
     }
 
+    public static func diagnoseFailureReason(from log: String) -> String {
+        if log.contains("It seems the App source") || log.contains("is not there") {
+            return "原应用可能已被手动删除，建议重新安装"
+        }
+        if log.contains("already installed by") || log.contains("conflict") || log.contains("exists and is not an empty directory") {
+            return "检测到同名依赖或软链接冲突"
+        }
+        if log.contains("Permission denied") || log.contains("operation not permitted") || log.contains("need sudo") {
+            return "系统权限不足，需管理员授权"
+        }
+        if log.contains("checksum") || log.contains("SHA256 mismatch") {
+            return "安装包哈希校验失败"
+        }
+        if log.contains("timed out") || log.contains("Connection refused") || log.contains("Could not resolve host") {
+            return "网络连接超时或源不可达"
+        }
+        return "升级失败，请查看控制台日志"
+    }
+
     public func buildBatchUpgradeCommands(for items: [SoftwarePackageItem]) -> [(command: String, items: [SoftwarePackageItem])] {
         var results: [(command: String, items: [SoftwarePackageItem])] = []
 
-        // 1. Group brewFormula
+        // 1. Group brewFormula (命令行工具高效合并升级)
         let formulae = items.filter { $0.source == .brewFormula }
         if !formulae.isEmpty {
             let names = formulae.map { $0.rawName }.joined(separator: " ")
-            results.append((command: "brew upgrade \(names)", items: formulae))
+            results.append((command: "HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 brew upgrade \(names)", items: formulae))
         }
 
-        // 2. Group brewCask
+        // 2. brewCask 桌面应用逐项独立执行（防单应用失败连累整批，且提供精细化进度反馈）
         let casks = items.filter { $0.source == .brewCask }
-        if !casks.isEmpty {
-            let names = casks.map { $0.rawName }.joined(separator: " ")
-            results.append((command: "brew upgrade --cask \(names)", items: casks))
+        for cask in casks {
+            results.append((command: buildUpgradeCommand(for: cask), items: [cask]))
         }
 
         // 3. Other sources (npm, volta, mas, pipx, cargo) execute per-item
@@ -136,8 +154,26 @@ public final class SoftwareUpdateService: @unchecked Sendable {
                 title: "npm 全局模块",
                 check: { [self] in
                     let npmOut = await executeShellCommand("npm -g outdated --json 2>/dev/null", streamOutput: false)
-                    return PackageParsers.parseNpmOutdated(jsonString: npmOut).filter {
+                    let items = PackageParsers.parseNpmOutdated(jsonString: npmOut).filter {
                         !UpdateSettingsStore.shared.shouldSkipUpdate(rawName: $0.rawName, latestVersion: $0.latestVersion)
+                    }
+                    // 真实运行版本安全校验（防御 Volta/多环境缓存目录旧数据残留）
+                    return await withTaskGroup(of: SoftwarePackageItem?.self) { group in
+                        for item in items {
+                            group.addTask { [self] in
+                                let liveVer = await self.executeShellCommand("\(item.rawName) --version 2>/dev/null", streamOutput: false)
+                                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                                if !liveVer.isEmpty && (liveVer == item.latestVersion || liveVer.contains(item.latestVersion)) {
+                                    return nil
+                                }
+                                return item
+                            }
+                        }
+                        var verified: [SoftwarePackageItem] = []
+                        for await v in group {
+                            if let v = v { verified.append(v) }
+                        }
+                        return verified.sorted { $0.displayName < $1.displayName }
                     }
                 }
             ))

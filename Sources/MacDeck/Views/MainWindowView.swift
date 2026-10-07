@@ -36,30 +36,45 @@ enum WindowTypeFilter: String, CaseIterable, Identifiable {
 @MainActor
 struct MainWindowView: View {
     @StateObject private var state: AppState
+    @StateObject private var systemInfoVM: SystemInfoViewModel
+    @StateObject private var softwareUpdateVM: SoftwareUpdateViewModel
+    @StateObject private var environmentVM: EnvironmentMaintenanceViewModel
     @ObservedObject private var loc = LocalizationService.shared
     @State private var selectedTab: NavigationItem
     private var customSystemInfoVM: SystemInfoViewModel?
 
     init() {
         _state = StateObject(wrappedValue: AppState())
+        _systemInfoVM = StateObject(wrappedValue: SystemInfoViewModel())
+        _softwareUpdateVM = StateObject(wrappedValue: SoftwareUpdateViewModel())
+        _environmentVM = StateObject(wrappedValue: EnvironmentMaintenanceViewModel())
         self.customSystemInfoVM = nil
         _selectedTab = State(initialValue: .systemInfo)
     }
 
     init(systemInfoVM: SystemInfoViewModel?, selectedTab: NavigationItem = .systemInfo) {
         _state = StateObject(wrappedValue: AppState())
+        _systemInfoVM = StateObject(wrappedValue: systemInfoVM ?? SystemInfoViewModel())
+        _softwareUpdateVM = StateObject(wrappedValue: SoftwareUpdateViewModel())
+        _environmentVM = StateObject(wrappedValue: EnvironmentMaintenanceViewModel())
         self.customSystemInfoVM = systemInfoVM
         _selectedTab = State(initialValue: selectedTab)
     }
 
     init(selectedTab: NavigationItem) {
         _state = StateObject(wrappedValue: AppState())
+        _systemInfoVM = StateObject(wrappedValue: SystemInfoViewModel())
+        _softwareUpdateVM = StateObject(wrappedValue: SoftwareUpdateViewModel())
+        _environmentVM = StateObject(wrappedValue: EnvironmentMaintenanceViewModel())
         self.customSystemInfoVM = nil
         _selectedTab = State(initialValue: selectedTab)
     }
 
     init(state: AppState, selectedTab: NavigationItem = .windowLayout) {
         _state = StateObject(wrappedValue: state)
+        _systemInfoVM = StateObject(wrappedValue: SystemInfoViewModel())
+        _softwareUpdateVM = StateObject(wrappedValue: SoftwareUpdateViewModel())
+        _environmentVM = StateObject(wrappedValue: EnvironmentMaintenanceViewModel())
         self.customSystemInfoVM = nil
         _selectedTab = State(initialValue: selectedTab)
     }
@@ -104,15 +119,15 @@ struct MainWindowView: View {
             Group {
                 switch selectedTab {
                 case .systemInfo:
-                    SystemInfoView(viewModel: customSystemInfoVM ?? SystemInfoViewModel())
+                    SystemInfoView(viewModel: customSystemInfoVM ?? systemInfoVM)
                 case .windowLayout:
                     windowLayoutView
                 case .displays:
                     DisplaysOverviewView(state: state)
                 case .softwareUpdate:
-                    SoftwareUpdateView()
+                    SoftwareUpdateView(viewModel: softwareUpdateVM)
                 case .environment:
-                    EnvironmentMaintenanceView()
+                    EnvironmentMaintenanceView(viewModel: environmentVM)
                 case .settings:
                     SettingsView(state: state)
                 }

@@ -13,7 +13,7 @@ final class SoftwareUpdateServiceTests: XCTestCase {
             latestVersion: "2.0",
             source: .brewCask
         )
-        XCTAssertEqual(service.buildUpgradeCommand(for: cask), "brew upgrade --cask docker")
+        XCTAssertEqual(service.buildUpgradeCommand(for: cask), "HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 brew upgrade --cask docker")
 
         let formula = SoftwarePackageItem(
             id: "brew:formula:node",
@@ -23,7 +23,7 @@ final class SoftwareUpdateServiceTests: XCTestCase {
             latestVersion: "22.0",
             source: .brewFormula
         )
-        XCTAssertEqual(service.buildUpgradeCommand(for: formula), "brew upgrade node")
+        XCTAssertEqual(service.buildUpgradeCommand(for: formula), "HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 brew upgrade node")
 
         let npm = SoftwarePackageItem(
             id: "npm:global:wrangler",
@@ -68,13 +68,18 @@ final class SoftwareUpdateServiceTests: XCTestCase {
 
         let batches = service.buildBatchUpgradeCommands(for: [f1, f2, c1, c2, n1, v1])
 
-        let formulaBatch = batches.first { $0.command == "brew upgrade node git" }
+        let formulaBatch = batches.first { $0.command.contains("brew upgrade node git") }
         XCTAssertNotNil(formulaBatch)
         XCTAssertEqual(formulaBatch?.items.count, 2)
+        XCTAssertTrue(formulaBatch?.command.contains("HOMEBREW_NO_AUTO_UPDATE=1") == true)
 
-        let caskBatch = batches.first { $0.command == "brew upgrade --cask docker chrome" }
-        XCTAssertNotNil(caskBatch)
-        XCTAssertEqual(caskBatch?.items.count, 2)
+        let dockerCaskBatch = batches.first { $0.command.contains("brew upgrade --cask docker") }
+        XCTAssertNotNil(dockerCaskBatch)
+        XCTAssertEqual(dockerCaskBatch?.items.count, 1)
+
+        let chromeCaskBatch = batches.first { $0.command.contains("brew upgrade --cask chrome") }
+        XCTAssertNotNil(chromeCaskBatch)
+        XCTAssertEqual(chromeCaskBatch?.items.count, 1)
 
         let npmBatch = batches.first { $0.command == "npm install -g wrangler@latest" }
         XCTAssertNotNil(npmBatch)

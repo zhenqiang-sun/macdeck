@@ -1,6 +1,6 @@
 import Foundation
 
-public enum DiskWatermarkLevel: Equatable {
+public enum DiskWatermarkLevel: Equatable, Codable {
     case healthy
     case warning
     case danger
@@ -16,7 +16,7 @@ public enum DiskWatermarkLevel: Equatable {
     }
 }
 
-public struct StorageVolumeInfo: Identifiable, Equatable {
+public struct StorageVolumeInfo: Identifiable, Equatable, Codable {
     public var id: String { mountPath }
     public let name: String
     public let mountPath: String
@@ -51,7 +51,7 @@ public struct StorageVolumeInfo: Identifiable, Equatable {
     }
 }
 
-public struct WiFiDetailInfo: Equatable {
+public struct WiFiDetailInfo: Equatable, Codable {
     public let ssid: String
     public let bssid: String?
     public let band: String
@@ -79,7 +79,7 @@ public struct WiFiDetailInfo: Equatable {
     }
 }
 
-public struct NetworkDetailInfo: Equatable {
+public struct NetworkDetailInfo: Equatable, Codable {
     public var primaryIPv4: String
     public var ipv6Global: String?
     public var ipv6LinkLocal: String?
@@ -110,7 +110,7 @@ public struct NetworkDetailInfo: Equatable {
     }
 }
 
-public struct ProcessorDetailInfo: Equatable {
+public struct ProcessorDetailInfo: Equatable, Codable {
     public var chipName: String
     public var totalCPUCores: Int
     public var performanceCores: Int
@@ -147,7 +147,7 @@ public struct ProcessorDetailInfo: Equatable {
     }
 }
 
-public struct SecurityDetailInfo: Equatable {
+public struct SecurityDetailInfo: Equatable, Codable {
     public var sipEnabled: Bool
     public var fileVaultEnabled: Bool
     public var gatekeeperEnabled: Bool
@@ -175,7 +175,7 @@ public struct SecurityDetailInfo: Equatable {
     }
 }
 
-public struct BatteryDetailInfo: Equatable {
+public struct BatteryDetailInfo: Equatable, Codable {
     public let healthPercentage: Int?
     public let cycleCount: Int?
     public let currentPercentage: Int
@@ -200,7 +200,7 @@ public struct BatteryDetailInfo: Equatable {
     }
 }
 
-public struct SystemInfoReport: Equatable {
+public struct SystemInfoReport: Equatable, Codable {
     public var machineName: String
     public var modelIdentifier: String
     public var serialNumber: String

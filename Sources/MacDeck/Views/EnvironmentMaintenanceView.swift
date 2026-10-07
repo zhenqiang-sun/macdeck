@@ -1,11 +1,20 @@
 import SwiftUI
 import AppKit
 
+@MainActor
 struct EnvironmentMaintenanceView: View {
-    @StateObject private var vm = EnvironmentMaintenanceViewModel()
+    @ObservedObject private var vm: EnvironmentMaintenanceViewModel
     @ObservedObject private var loc = LocalizationService.shared
     @State private var expandedDoctorIds: Set<String> = []
     @State private var copiedFixId: String? = nil
+
+    init() {
+        self.vm = EnvironmentMaintenanceViewModel()
+    }
+
+    init(viewModel: EnvironmentMaintenanceViewModel) {
+        self.vm = viewModel
+    }
 
     var body: some View {
         VStack(spacing: 0) {

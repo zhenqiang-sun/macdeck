@@ -6,6 +6,9 @@ struct PackageRowView: View {
     let isUpdatesScope: Bool
     let onUpgrade: () -> Void
     let onUninstall: () -> Void
+    var onTogglePin: (() -> Void)? = nil
+    var onToggleIgnore: (() -> Void)? = nil
+    var onRemoveFromList: (() -> Void)? = nil
 
     @State private var isHovered = false
 
@@ -16,7 +19,8 @@ struct PackageRowView: View {
                 Toggle("", isOn: $item.isSelected)
                     .labelsHidden()
                     .toggleStyle(.checkbox)
-                    .disabled(item.status == .upgrading || item.status == .upgraded)
+                    .disabled(item.status == .upgrading || item.status == .upgraded || item.isPinned || item.isIgnored)
+                    .opacity(item.isPinned || item.isIgnored ? 0.35 : 1.0)
                     .frame(width: 18)
             }
 
@@ -67,7 +71,7 @@ struct PackageRowView: View {
                             .foregroundColor(.secondary.opacity(0.6))
                         Text(item.latestVersion)
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundColor(DeckTheme.Colors.success)
+                            .foregroundColor(item.isIgnored ? .secondary : DeckTheme.Colors.success)
 
                         if item.isMajorUpdate {
                             Text("Major")
@@ -80,13 +84,31 @@ struct PackageRowView: View {
                         }
 
                         if item.isPinned {
-                            Text("update.pinned_badge".localized)
-                                .font(.system(size: 9, weight: .bold))
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1.5)
-                                .background(DeckTheme.Colors.secondaryFill)
-                                .foregroundColor(.secondary)
-                                .cornerRadius(DeckTheme.CornerRadius.badge)
+                            HStack(spacing: 3) {
+                                Image(systemName: "pin.fill")
+                                    .font(.system(size: 8))
+                                Text("update.pinned_badge".localized)
+                            }
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1.5)
+                            .background(Color.secondary.opacity(0.15))
+                            .foregroundColor(.secondary)
+                            .cornerRadius(DeckTheme.CornerRadius.badge)
+                        }
+
+                        if item.isIgnored {
+                            HStack(spacing: 3) {
+                                Image(systemName: "eye.slash.fill")
+                                    .font(.system(size: 8))
+                                Text("update.ignored_badge".localized)
+                            }
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1.5)
+                            .background(DeckTheme.Colors.warning.opacity(0.18))
+                            .foregroundColor(DeckTheme.Colors.warning)
+                            .cornerRadius(DeckTheme.CornerRadius.badge)
                         }
                     }
                 } else {
@@ -96,13 +118,31 @@ struct PackageRowView: View {
                             .foregroundColor(.secondary)
 
                         if item.isPinned {
-                            Text("update.pinned_badge".localized)
-                                .font(.system(size: 9, weight: .bold))
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1.5)
-                                .background(DeckTheme.Colors.secondaryFill)
-                                .foregroundColor(.secondary)
-                                .cornerRadius(DeckTheme.CornerRadius.badge)
+                            HStack(spacing: 3) {
+                                Image(systemName: "pin.fill")
+                                    .font(.system(size: 8))
+                                Text("update.pinned_badge".localized)
+                            }
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1.5)
+                            .background(Color.secondary.opacity(0.15))
+                            .foregroundColor(.secondary)
+                            .cornerRadius(DeckTheme.CornerRadius.badge)
+                        }
+
+                        if item.isIgnored {
+                            HStack(spacing: 3) {
+                                Image(systemName: "eye.slash.fill")
+                                    .font(.system(size: 8))
+                                Text("update.ignored_badge".localized)
+                            }
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1.5)
+                            .background(DeckTheme.Colors.warning.opacity(0.18))
+                            .foregroundColor(DeckTheme.Colors.warning)
+                            .cornerRadius(DeckTheme.CornerRadius.badge)
                         }
                     }
                 }
@@ -114,32 +154,50 @@ struct PackageRowView: View {
             HStack(spacing: 8) {
                 // If has update available
                 if item.hasUpdate {
-                    switch item.status {
-                    case .available:
-                        Button(action: onUpgrade) {
-                            Text("update.upgrade_action".localized)
+                    if item.isPinned {
+                        Text("update.pinned_badge".localized)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(DeckTheme.Colors.secondaryFill)
+                            .cornerRadius(DeckTheme.CornerRadius.badge)
+                    } else if item.isIgnored {
+                        Text("update.ignored_badge".localized)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(DeckTheme.Colors.secondaryFill)
+                            .cornerRadius(DeckTheme.CornerRadius.badge)
+                    } else {
+                        switch item.status {
+                        case .available:
+                            Button(action: onUpgrade) {
+                                Text("update.upgrade_action".localized)
+                            }
+                            .deckCompactButton(isProminent: true)
+
+                        case .upgrading:
+                            HStack(spacing: 4) {
+                                ProgressView()
+                                    .controlSize(.mini)
+                                Text("update.upgrading_tag".localized)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+
+                        case .upgraded:
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(DeckTheme.Colors.success)
+                                .font(.system(size: 14))
+
+                        case .failed(let message):
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(DeckTheme.Colors.danger)
+                                .font(.system(size: 14))
+                                .help(message)
                         }
-                        .deckCompactButton(isProminent: true)
-
-                    case .upgrading:
-                        HStack(spacing: 4) {
-                            ProgressView()
-                                .controlSize(.mini)
-                            Text("update.upgrading_tag".localized)
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                        }
-
-                    case .upgraded:
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(DeckTheme.Colors.success)
-                            .font(.system(size: 14))
-
-                    case .failed(let message):
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(DeckTheme.Colors.danger)
-                            .font(.system(size: 14))
-                            .help(message)
                     }
                 }
 
@@ -155,6 +213,7 @@ struct PackageRowView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
+        .opacity((item.isPinned || item.isIgnored) && isUpdatesScope ? 0.6 : 1.0)
         .background(
             RoundedRectangle(cornerRadius: DeckTheme.CornerRadius.card)
                 .fill(isHovered ? DeckTheme.Colors.cardBackground.opacity(0.8) : Color.clear)
@@ -165,23 +224,30 @@ struct PackageRowView: View {
         .contextMenu {
             if item.isPinned {
                 Button("update.unpin_package".localized) {
-                    UpdateSettingsStore.shared.unpin(rawName: item.rawName)
+                    onTogglePin?()
                 }
             } else {
                 Button("update.pin_package_hint".localized) {
-                    UpdateSettingsStore.shared.pinPackage(rawName: item.rawName)
+                    onTogglePin?()
                 }
             }
 
             if item.hasUpdate {
                 if item.isIgnored {
                     Button("update.restore_version_alert".localized) {
-                        UpdateSettingsStore.shared.unignore(rawName: item.rawName)
+                        onToggleIgnore?()
                     }
                 } else {
                     Button(String(format: "update.ignore_this_version".localized, item.latestVersion)) {
-                        UpdateSettingsStore.shared.ignoreVersion(rawName: item.rawName, version: item.latestVersion)
+                        onToggleIgnore?()
                     }
+                }
+            }
+
+            if isUpdatesScope && (item.isIgnored || item.isPinned) {
+                Divider()
+                Button("update.remove_from_list".localized) {
+                    onRemoveFromList?()
                 }
             }
         }

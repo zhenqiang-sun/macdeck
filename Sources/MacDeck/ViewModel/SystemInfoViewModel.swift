@@ -11,15 +11,25 @@ public final class SystemInfoViewModel: ObservableObject {
     @Published public var copyFeedbackMessage: String? = nil
 
     private var resetFeedbackTask: Task<Void, Never>?
+    private let cacheStore: SystemInfoCacheStore
 
-    public init() {}
+    public init(cacheStore: SystemInfoCacheStore = .shared) {
+        self.cacheStore = cacheStore
+        if let cached = cacheStore.loadCachedReport() {
+            self.report = cached
+            self.isLoading = false
+        }
+    }
 
     public func loadInfo() async {
         guard !isLoading else { return }
-        isLoading = true
+        if self.report == nil {
+            isLoading = true
+        }
         let data = await SystemInfoService.shared.collectSystemInfo()
         self.report = data
         self.isLoading = false
+        cacheStore.saveCachedReport(data)
     }
 
     public func refresh() {

@@ -83,13 +83,8 @@ public struct SoftwarePackageItem: Identifiable, Equatable {
         return latestVersion != currentVersion && !latestVersion.isEmpty && latestVersion != "最新"
     }
 
-    public var isPinned: Bool {
-        UpdateSettingsStore.shared.isPinned(rawName: rawName)
-    }
-
-    public var isIgnored: Bool {
-        UpdateSettingsStore.shared.ignoredVersion(for: rawName) == latestVersion
-    }
+    public var isPinned: Bool
+    public var isIgnored: Bool
 
     public var isMajorUpdate: Bool {
         VersionHelper.isMajorUpdate(current: currentVersion, latest: latestVersion)
@@ -103,7 +98,9 @@ public struct SoftwarePackageItem: Identifiable, Equatable {
         latestVersion: String,
         source: PackageSource,
         isSelected: Bool = true,
-        status: PackageStatus = .available
+        status: PackageStatus = .available,
+        isPinned: Bool? = nil,
+        isIgnored: Bool? = nil
     ) {
         self.id = id
         self.rawName = rawName
@@ -111,8 +108,13 @@ public struct SoftwarePackageItem: Identifiable, Equatable {
         self.currentVersion = currentVersion
         self.latestVersion = latestVersion
         self.source = source
-        self.isSelected = isSelected
         self.status = status
+
+        let resolvedPinned = isPinned ?? UpdateSettingsStore.shared.isPinned(rawName: rawName)
+        let resolvedIgnored = isIgnored ?? (UpdateSettingsStore.shared.ignoredVersion(for: rawName) == latestVersion)
+        self.isPinned = resolvedPinned
+        self.isIgnored = resolvedIgnored
+        self.isSelected = (resolvedPinned || resolvedIgnored) ? false : isSelected
     }
 }
 

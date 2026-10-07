@@ -188,7 +188,7 @@ struct SettingsView: View {
                         HStack(spacing: 6) {
                             Text("MacDeck")
                                 .font(.system(size: 13, weight: .bold))
-                            let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.0"
+                            let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.1"
                             Text("v\(appVersion)")
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundColor(.secondary)

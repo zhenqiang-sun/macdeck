@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.1] - 2026-10-07
+
+### Fixed
+- **Multi-Display Window Restoration (Adaptive Convergence Loop)**:
+  - Fixed an issue where restoring windows across displays with different resolutions or DPI required multiple clicks (2~3 times) to fully restore both size and position.
+  - Introduced **Cross-Screen Safety Anchor**: Prioritizes moving window origins into the target display first with a 35ms scheduling yield, eliminating WindowServer boundary clamping.
+  - Implemented **Adaptive Convergence Readback Loop**: Dynamically measures physical frame differences ($dx, dy, dw, dh \le 2.0\text{pt}$) and auto-compensates within 1 pass for instantaneous 1-click restoration.
+  - Added smart physical limit stagnation detection for constraint-bound applications (Calculator, System Settings, fixed panels).
+
 ## [1.2.0] - 2026-10-07
 
 ### Added

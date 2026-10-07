@@ -462,23 +462,14 @@ public final class WindowManager {
             }
         }
 
-        // 6. 移动与尺寸定位：采用“先安全尺寸 -> 再定位 -> 再校准”三步走
-        var newPoint = targetFrame.origin
-        var newSize = targetFrame.size
-
-        if let sizeVal = AXValueCreate(.cgSize, &newSize) {
-            AXUIElementSetAttributeValue(axElem, kAXSizeAttribute as CFString, sizeVal)
-        }
-        if let posVal = AXValueCreate(.cgPoint, &newPoint) {
-            AXUIElementSetAttributeValue(axElem, kAXPositionAttribute as CFString, posVal)
-        }
-        // 尺寸调整后再次校准位置，防止因窗口初始尺寸越界引发的系统自动吸附偏差
-        if let sizeVal = AXValueCreate(.cgSize, &newSize) {
-            AXUIElementSetAttributeValue(axElem, kAXSizeAttribute as CFString, sizeVal)
-        }
-        if let posVal = AXValueCreate(.cgPoint, &newPoint) {
-            AXUIElementSetAttributeValue(axElem, kAXPositionAttribute as CFString, posVal)
-        }
+        // 6. 移动与尺寸定位：自适应跨屏安全先导与闭环收敛（Adaptive Convergence Loop）
+        // 彻底解决跨屏尺寸裁剪（Screen Boundary Clamping）引发的需手动点击 2~3 次才完全复原的 Bug。
+        Self.applyFrameWithConvergence(
+            element: axElem,
+            targetFrame: targetFrame,
+            targetScreen: targetScreen,
+            isAlreadyOnTargetScreen: isAlreadyOnTargetScreen
+        )
 
         // 7. 若目标状态期望全屏，在目标屏幕就位后切入全屏 Space，并提供闭环验证与重试
         if shouldBeFullScreen {
@@ -502,4 +493,104 @@ public final class WindowManager {
 
         return true
     }
+
+    // MARK: - 跨屏窗口几何形变与自适应收敛引擎
+
+    /// 核心窗口几何形变与闭环收敛引擎
+    /// 彻底解决跨屏幕移动时 macOS WindowServer 的尺寸裁剪（Screen Boundary Clamping）、
+    /// DPI 缩放延迟、以及单向发射无反馈导致的需手动点击 2~3 次才完全复原的 Bug。
+    public static func applyFrameWithConvergence(
+        element: AXUIElement,
+        targetFrame: CGRect,
+        targetScreen: NSScreen,
+        isAlreadyOnTargetScreen: Bool,
+        maxPasses: Int = 3
+    ) {
+        var targetPoint = targetFrame.origin
+        var targetSize = targetFrame.size
+
+        // 阶段 1：跨屏安全先导锚定（Cross-Screen Safety Anchor）
+        // 若当前窗口不在目标屏幕上，必须先将其原点移入目标屏幕范围，并让步 35ms。
+        // 这使得 macOS WindowServer 能够及时将该窗口的宿主屏幕重新绑定至目标屏，
+        // 彻底解除来源屏幕（如 MacBook 内屏）对窗口尺寸的物理 Clamping 锁定。
+        if !isAlreadyOnTargetScreen {
+            if let posVal = AXValueCreate(.cgPoint, &targetPoint) {
+                AXUIElementSetAttributeValue(element, kAXPositionAttribute as CFString, posVal)
+            }
+            usleep(35_000) // 35ms 缓冲让 WindowServer 调度屏幕切换
+        }
+
+        // 阶段 2：自适应闭环收敛循环（Adaptive Convergence Loop）
+        // 在目标屏幕上进行最多 maxPasses 轮的“尺寸设置 -> 坐标修正 -> 几何回读 -> 误差评估”
+        var lastObservedSize: CGSize? = nil
+        for pass in 1...maxPasses {
+            // 步骤 A：应用尺寸（此时由于已在目标屏，WindowServer 会以目标屏可用边界进行计算）
+            if let sizeVal = AXValueCreate(.cgSize, &targetSize) {
+                AXUIElementSetAttributeValue(element, kAXSizeAttribute as CFString, sizeVal)
+            }
+            // 步骤 B：应用精确原点位置
+            if let posVal = AXValueCreate(.cgPoint, &targetPoint) {
+                AXUIElementSetAttributeValue(element, kAXPositionAttribute as CFString, posVal)
+            }
+
+            // 步骤 C：让步让 WindowServer 与宿主 App UI 线程完成重绘与重排
+            // 同屏时 20ms，跨屏首轮 25ms
+            let waitInterval: useconds_t = (!isAlreadyOnTargetScreen && pass == 1) ? 25_000 : 20_000
+            usleep(waitInterval)
+
+            // 步骤 D：回读（Readback）当前窗口的实际物理几何
+            guard let currentGeometry = getWindowGeometry(element: element) else {
+                // 若目标窗口不支持回读（如极端非标准窗口），发完即视作完成
+                break
+            }
+
+            let curPoint = currentGeometry.point
+            let curSize = currentGeometry.size
+
+            let dx = abs(curPoint.x - targetPoint.x)
+            let dy = abs(curPoint.y - targetPoint.y)
+            let dw = abs(curSize.width - targetSize.width)
+            let dh = abs(curSize.height - targetSize.height)
+
+            // 判定完全收敛条件：位置与尺寸误差均在容差范围（<= 2.0pt）内
+            if dx <= 2.0 && dy <= 2.0 && dw <= 2.0 && dh <= 2.0 {
+                break // 几何完全吻合，一次到位，立即退出
+            }
+
+            // 应用程序物理极限制约探测（如固定宽度面板、最小限制等）：
+            // 若尺寸连续两轮无实质变化（停滞），说明已达应用自身硬性限制，强行重试无意义，补发一次位置后直接退出
+            if let last = lastObservedSize,
+               abs(last.width - curSize.width) < 1.0 && abs(last.height - curSize.height) < 1.0 {
+                if let posVal = AXValueCreate(.cgPoint, &targetPoint) {
+                    AXUIElementSetAttributeValue(element, kAXPositionAttribute as CFString, posVal)
+                }
+                break
+            }
+            lastObservedSize = curSize
+        }
+    }
+
+    /// 读取指定 AXUIElement 窗口当前的物理坐标与物理尺寸
+    public static func getWindowGeometry(element: AXUIElement) -> (point: CGPoint, size: CGSize)? {
+        var posVal: AnyObject?
+        var sizeVal: AnyObject?
+        let posStatus = AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &posVal)
+        let sizeStatus = AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeVal)
+
+        var point = CGPoint.zero
+        var size = CGSize.zero
+        var hasPoint = false
+        var hasSize = false
+
+        if posStatus == .success, let p = posVal, CFGetTypeID(p) == AXValueGetTypeID() {
+            hasPoint = AXValueGetValue(p as! AXValue, .cgPoint, &point)
+        }
+        if sizeStatus == .success, let s = sizeVal, CFGetTypeID(s) == AXValueGetTypeID() {
+            hasSize = AXValueGetValue(s as! AXValue, .cgSize, &size)
+        }
+
+        guard hasPoint && hasSize else { return nil }
+        return (point, size)
+    }
 }
+

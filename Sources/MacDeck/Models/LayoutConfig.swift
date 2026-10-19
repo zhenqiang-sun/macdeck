@@ -294,6 +294,31 @@ public struct LayoutConfig: Codable, Equatable {
         return modified
     }
 
+    @discardableResult
+    public mutating func healDuplicateBrowserPresets() -> Bool {
+        var modified = false
+        for pIdx in 0..<presets.count {
+            var seenBrowserKeys = Set<String>()
+            var uniqueItems: [WindowLayoutItem] = []
+            // 从后往前遍历：保留最新记录的一份（后记录的覆盖先记录的）
+            for item in presets[pIdx].items.reversed() {
+                if BrowserHelper.isBrowser(bundleIdentifier: item.bundleIdentifier) {
+                    let key = "\(item.bundleIdentifier):\(item.profile ?? "default"):\(item.windowIndex):\(item.targetDisplayUUID ?? "")"
+                    if seenBrowserKeys.contains(key) {
+                        modified = true
+                        continue
+                    }
+                    seenBrowserKeys.insert(key)
+                }
+                uniqueItems.append(item)
+            }
+            if modified {
+                presets[pIdx].items = uniqueItems.reversed()
+            }
+        }
+        return modified
+    }
+
     public static func migrateV2Profiles(
         profiles: [WorkspaceProfile],
         activeProfileId: UUID?,

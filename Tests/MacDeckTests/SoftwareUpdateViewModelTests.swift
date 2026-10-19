@@ -164,4 +164,60 @@ final class SoftwareUpdateViewModelTests: XCTestCase {
         XCTAssertEqual(vm.items.count, 1)
         XCTAssertEqual(vm.items.first?.id, "2")
     }
+
+    func testMarkPackageUpgradedFromStreamUpdatesItemStatusImmediately() {
+        let vm = SoftwareUpdateViewModel()
+        let item1 = SoftwarePackageItem(id: "brew:formula:git", rawName: "git", displayName: "Git", currentVersion: "2.55.0", latestVersion: "2.56.0_1", source: .brewFormula, isSelected: true, status: .upgrading)
+        let item2 = SoftwarePackageItem(id: "brew:formula:go", rawName: "go", displayName: "Go", currentVersion: "1.26.0", latestVersion: "1.27.2", source: .brewFormula, isSelected: true, status: .upgrading)
+        vm.items = [item1, item2]
+
+        vm.markPackageUpgradedFromStream(upgradedName: "git", in: [item1, item2])
+
+        XCTAssertEqual(vm.items[0].status, .upgraded)
+        XCTAssertEqual(vm.items[0].currentVersion, "2.56.0_1")
+        XCTAssertFalse(vm.items[0].isSelected)
+
+        // go is untouched and still upgrading
+        XCTAssertEqual(vm.items[1].status, .upgrading)
+        XCTAssertTrue(vm.items[1].isSelected)
+    }
+
+    func testReconcileBatchItemStatusesDifferentiatesSuccessAndFailure() {
+        let vm = SoftwareUpdateViewModel()
+        let item1 = SoftwarePackageItem(id: "brew:formula:git", rawName: "git", displayName: "Git", currentVersion: "2.55.0", latestVersion: "2.56.0_1", source: .brewFormula, isSelected: true, status: .upgrading)
+        let item2 = SoftwarePackageItem(id: "brew:formula:go", rawName: "go", displayName: "Go", currentVersion: "1.26.0", latestVersion: "1.27.2", source: .brewFormula, isSelected: true, status: .upgrading)
+        let tapItem = SoftwarePackageItem(id: "brew:formula:opencode", rawName: "anomalyco/tap/opencode", displayName: "Opencode", currentVersion: "1.18.0", latestVersion: "1.19.2", source: .brewFormula, isSelected: true, status: .upgrading)
+        vm.items = [item1, item2, tapItem]
+
+        let installedMap: [String: [String]] = [
+            "git": ["2.56.0_1"],
+            "opencode": ["1.19.2"],
+            "go": ["1.26.0"]
+        ]
+
+        let (successCount, failureCount, records) = vm.reconcileBatchItemStatuses(
+            items: [item1, item2, tapItem],
+            installedVersionsMap: installedMap,
+            failureReason: "网络连接失败",
+            command: "brew upgrade ...",
+            consoleLog: "curl error..."
+        )
+
+        XCTAssertEqual(successCount, 2)
+        XCTAssertEqual(failureCount, 1)
+
+        XCTAssertEqual(vm.items[0].status, .upgraded)
+        XCTAssertEqual(vm.items[0].currentVersion, "2.56.0_1")
+
+        XCTAssertEqual(vm.items[1].status, .failed(message: "网络连接失败"))
+        XCTAssertEqual(vm.items[1].currentVersion, "1.26.0")
+
+        XCTAssertEqual(vm.items[2].status, .upgraded)
+        XCTAssertEqual(vm.items[2].currentVersion, "1.19.2")
+
+        XCTAssertEqual(records.count, 3)
+        XCTAssertEqual(records[0].status, UpdateRecordStatus.success)
+        XCTAssertEqual(records[1].status, UpdateRecordStatus.failed)
+        XCTAssertEqual(records[2].status, UpdateRecordStatus.success)
+    }
 }

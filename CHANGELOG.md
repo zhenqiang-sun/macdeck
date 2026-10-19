@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.3] - 2026-10-19
+
+### Fixed
+- **Browser Window Restoration & Tab Independence (浏览器标签页切换状态丢失修复)**:
+  - **Dynamic Tab Independence**: Fixed an issue where switching active tabs or navigating pages in web browsers (Chrome, Safari, Edge, Arc, Firefox, Brave) caused the window to lose its recorded layout state, displaying as "未记录" and hiding the "归位" (Restore) button.
+  - **Multi-Display Z-Order Inversion Tolerance**: Implemented screen-prioritized window matching (`targetDisplayUUID`) allowing browser windows across multiple displays to reliably restore to their designated monitors even when window focus/index flips.
+  - **Ghost Preset Elimination & Auto-Healing**: Re-recording or removing browser windows now cleanly overwrites/removes entries by `(bundleId, profile, windowIndex)` rather than accumulating orphaned presets with stale tab titles; existing duplicate browser entries in `layouts.json` are automatically healed and deduplicated on load.
+
+## [1.2.2] - 2026-10-19
+
+### Enhanced
+- **Software Update Batch Optimization (Dual-Track Sensing & Reconciliation)**:
+  - **Live Stream Item State Detection**: Real-time parsing of streaming package manager output (`✔︎ Bottle ...`, `✔︎ Formula ...`, `🍺 Cellar/...`) dynamically lights up corresponding software rows to `.upgraded` with updated version numbers without UI freezing.
+  - **Post-Batch Precision Reconciliation**: Automatically cross-references installed binary versions (`brew list --versions`) upon batch completion. Prevents single-package network/download failures from cascading and falsely flagging all other successfully updated packages as failed.
+
 ## [1.2.1] - 2026-10-07
 
 ### Fixed

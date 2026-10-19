@@ -128,6 +128,13 @@ public final class SoftwareUpdateService: @unchecked Sendable {
         }
     }
 
+    public func fetchInstalledFormulaVersions(for rawNames: [String]) async -> [String: [String]] {
+        guard !rawNames.isEmpty else { return [:] }
+        let names = rawNames.joined(separator: " ")
+        let output = await executeShellCommand("brew list --versions \(names) 2>/dev/null", streamOutput: false)
+        return PackageParsers.parseBrewListVersions(output: output)
+    }
+
     public func fetchOutdatedPackages(onOutput: @escaping (String) -> Void) async -> [SoftwarePackageItem] {
         var items: [SoftwarePackageItem] = []
 

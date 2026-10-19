@@ -290,50 +290,78 @@ public final class SoftwareUpdateViewModel: ObservableObject {
                     displayTitle: displayTitle
                 ) { [weak self] line in
                     Task { @MainActor [weak self] in
-                        self?.appendConsole(line)
+                        guard let self = self else { return }
+                        self.appendConsole(line)
+                        if let upgradedName = PackageParsers.detectPackageUpgraded(from: line) {
+                            self.markPackageUpgradedFromStream(upgradedName: upgradedName, in: batch.items)
+                        }
                     }
-                }
-
-                if success {
-                    successCount += batch.items.count
-                } else {
-                    failureCount += batch.items.count
                 }
 
                 let failureReason = success ? "" : SoftwareUpdateService.diagnoseFailureReason(from: self.consoleLog)
-                for item in batch.items {
-                    if let idx = self.items.firstIndex(where: { $0.id == item.id }) {
-                        self.items[idx].status = success ? .upgraded : .failed(message: failureReason)
-                        if success {
-                            self.items[idx].currentVersion = item.latestVersion
-                            self.items[idx].isSelected = false
-                        }
+
+                if batch.items.count > 1 && batch.items.allSatisfy({ $0.source == .brewFormula }) {
+                    // 合并批次：通过 brew list --versions 精准对账，防止单包失败连累整批
+                    let installedMap = await self.service.fetchInstalledFormulaVersions(for: batch.items.map { $0.rawName })
+                    let result = await MainActor.run {
+                        self.reconcileBatchItemStatuses(
+                            items: batch.items,
+                            installedVersionsMap: installedMap,
+                            failureReason: failureReason,
+                            command: batch.command,
+                            consoleLog: self.consoleLog,
+                            isBatchSuccess: success
+                        )
                     }
-                    if let insIdx = self.installedItems.firstIndex(where: { $0.id == item.id }) {
-                        self.installedItems[insIdx].currentVersion = item.latestVersion
-                        self.installedItems[insIdx].status = success ? .upgraded : .failed(message: failureReason)
+                    successCount += result.successCount
+                    failureCount += result.failureCount
+                    await MainActor.run {
+                        self.historyStore.addRecords(result.records)
+                    }
+                } else {
+                    // 单项批次（Cask 或其它单包）
+                    await MainActor.run {
+                        if success {
+                            successCount += batch.items.count
+                        } else {
+                            failureCount += batch.items.count
+                        }
+
+                        for item in batch.items {
+                            if let idx = self.items.firstIndex(where: { $0.id == item.id }) {
+                                self.items[idx].status = success ? .upgraded : .failed(message: failureReason)
+                                if success {
+                                    self.items[idx].currentVersion = item.latestVersion
+                                    self.items[idx].isSelected = false
+                                }
+                            }
+                            if let insIdx = self.installedItems.firstIndex(where: { $0.id == item.id }) {
+                                self.installedItems[insIdx].currentVersion = item.latestVersion
+                                self.installedItems[insIdx].status = success ? .upgraded : .failed(message: failureReason)
+                            }
+                        }
+
+                        let newHistoryRecords = batch.items.map { item in
+                            UpdateHistoryRecord(
+                                packageId: item.id,
+                                packageName: item.displayName,
+                                source: item.source,
+                                previousVersion: item.currentVersion,
+                                targetVersion: item.latestVersion,
+                                status: success ? .success : .failed,
+                                command: batch.command,
+                                outputLog: self.consoleLog,
+                                rollbackHint: RollbackHelper.generateHint(source: item.source, name: item.rawName, previousVersion: item.currentVersion)
+                            )
+                        }
+                        self.historyStore.addRecords(newHistoryRecords)
                     }
                 }
 
-                // 记录审计历史
-                var newHistoryRecords: [UpdateHistoryRecord] = []
-                for item in batch.items {
-                    let record = UpdateHistoryRecord(
-                        packageId: item.id,
-                        packageName: item.displayName,
-                        source: item.source,
-                        previousVersion: item.currentVersion,
-                        targetVersion: item.latestVersion,
-                        status: success ? .success : .failed,
-                        command: batch.command,
-                        outputLog: self.consoleLog,
-                        rollbackHint: RollbackHelper.generateHint(source: item.source, name: item.rawName, previousVersion: item.currentVersion)
-                    )
-                    newHistoryRecords.append(record)
-                }
-                self.historyStore.addRecords(newHistoryRecords)
-                if self.currentScope == .history {
-                    self.loadHistory()
+                await MainActor.run {
+                    if self.currentScope == .history {
+                        self.loadHistory()
+                    }
                 }
             }
 
@@ -380,6 +408,86 @@ public final class SoftwareUpdateViewModel: ObservableObject {
             )
             UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
         }
+    }
+
+    @MainActor
+    public func markPackageUpgradedFromStream(upgradedName: String, in batchItems: [SoftwarePackageItem]) {
+        guard let target = batchItems.first(where: {
+            $0.rawName == upgradedName ||
+            $0.rawName.components(separatedBy: "/").last == upgradedName
+        }) else { return }
+
+        if let idx = self.items.firstIndex(where: { $0.id == target.id }) {
+            if self.items[idx].status != .upgraded {
+                self.items[idx].status = .upgraded
+                self.items[idx].currentVersion = target.latestVersion
+                self.items[idx].isSelected = false
+            }
+        }
+        if let insIdx = self.installedItems.firstIndex(where: { $0.id == target.id }) {
+            self.installedItems[insIdx].currentVersion = target.latestVersion
+            self.installedItems[insIdx].status = .upgraded
+        }
+    }
+
+    @discardableResult
+    @MainActor
+    public func reconcileBatchItemStatuses(
+        items batchItems: [SoftwarePackageItem],
+        installedVersionsMap: [String: [String]],
+        failureReason: String,
+        command: String,
+        consoleLog: String,
+        isBatchSuccess: Bool = false
+    ) -> (successCount: Int, failureCount: Int, records: [UpdateHistoryRecord]) {
+        var successCount = 0
+        var failureCount = 0
+        var newHistoryRecords: [UpdateHistoryRecord] = []
+
+        for item in batchItems {
+            let alreadyUpgraded = self.items.first(where: { $0.id == item.id })?.status == .upgraded
+            let isVerifiedUpgraded = isBatchSuccess || alreadyUpgraded || PackageParsers.isFormulaUpgraded(
+                rawName: item.rawName,
+                latestVersion: item.latestVersion,
+                installedVersionsMap: installedVersionsMap
+            )
+
+            if isVerifiedUpgraded {
+                successCount += 1
+                if let idx = self.items.firstIndex(where: { $0.id == item.id }) {
+                    self.items[idx].status = .upgraded
+                    self.items[idx].currentVersion = item.latestVersion
+                    self.items[idx].isSelected = false
+                }
+                if let insIdx = self.installedItems.firstIndex(where: { $0.id == item.id }) {
+                    self.installedItems[insIdx].currentVersion = item.latestVersion
+                    self.installedItems[insIdx].status = .upgraded
+                }
+            } else {
+                failureCount += 1
+                if let idx = self.items.firstIndex(where: { $0.id == item.id }) {
+                    self.items[idx].status = .failed(message: failureReason)
+                }
+                if let insIdx = self.installedItems.firstIndex(where: { $0.id == item.id }) {
+                    self.installedItems[insIdx].status = .failed(message: failureReason)
+                }
+            }
+
+            let record = UpdateHistoryRecord(
+                packageId: item.id,
+                packageName: item.displayName,
+                source: item.source,
+                previousVersion: item.currentVersion,
+                targetVersion: item.latestVersion,
+                status: isVerifiedUpgraded ? .success : .failed,
+                command: command,
+                outputLog: consoleLog,
+                rollbackHint: RollbackHelper.generateHint(source: item.source, name: item.rawName, previousVersion: item.currentVersion)
+            )
+            newHistoryRecords.append(record)
+        }
+
+        return (successCount, failureCount, newHistoryRecords)
     }
 
     public func requestUninstall(item: SoftwarePackageItem) {

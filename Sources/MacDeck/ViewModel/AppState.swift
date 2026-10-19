@@ -221,53 +221,156 @@ public final class AppState: ObservableObject {
         // 4. 合并窗口条目
         let savedItems = activePreset?.items ?? []
         let currentSnap = windowManager.captureSnapshot(displayAliases: aliasMap)
+        displayedItems = AppState.matchSnapshotItems(
+            currentSnap: currentSnap,
+            savedItems: savedItems,
+            displayAliases: aliasMap
+        )
+    }
+
+    /// 纯函数：将当前实时捕获的窗口与已保存的预设窗口条目进行智能匹配与合并
+    nonisolated public static func matchSnapshotItems(
+        currentSnap: [WindowLayoutItem],
+        savedItems: [WindowLayoutItem],
+        displayAliases: [String: String] = [:]
+    ) -> [WindowLayoutItem] {
         var mergedItems: [WindowLayoutItem] = []
         var matchedSavedIndices = Set<Int>()
+        var snapMatches: [Int: Int] = [:] // snapIdx -> savedIdx
 
-        for snap in currentSnap {
-            // 智能匹配逻辑：
-            // 1. 若当前窗口具有明确标题，优先寻找相同 bundleIdentifier、相同 profile 且相同标题的预设条目
-            // 2. 否则按 windowIndex 匹配（但若两者标题不同且均非空，则拒绝错位匹配）
-            var matchedIndex: Int? = nil
-            if let snapTitle = snap.windowTitle, !snapTitle.isEmpty {
-                matchedIndex = savedItems.indices.first { i in
-                    !matchedSavedIndices.contains(i) &&
-                    savedItems[i].bundleIdentifier == snap.bundleIdentifier &&
-                    savedItems[i].profile == snap.profile &&
-                    savedItems[i].windowTitle == snapTitle
-                }
+        func displayMatches(snap: WindowLayoutItem, saved: WindowLayoutItem) -> Bool {
+            guard let snapDisp = snap.targetDisplayUUID, !snapDisp.isEmpty,
+                  let savedDisp = saved.targetDisplayUUID, !savedDisp.isEmpty else {
+                return false
             }
-
-            if matchedIndex == nil {
-                matchedIndex = savedItems.indices.first { i in
-                    guard !matchedSavedIndices.contains(i),
-                          savedItems[i].bundleIdentifier == snap.bundleIdentifier,
-                          savedItems[i].profile == snap.profile,
-                          savedItems[i].windowIndex == snap.windowIndex else { return false }
-
-                    // 若两者皆有非空标题，且不相同，则不应盲目按 index 覆盖（防止启动器和会话窗口混淆）
-                    if let snapTitle = snap.windowTitle, !snapTitle.isEmpty,
-                       let savedTitle = savedItems[i].windowTitle, !savedTitle.isEmpty,
-                       snapTitle != savedTitle {
-                        return false
-                    }
-                    return true
-                }
+            if snapDisp == savedDisp { return true }
+            let snapAlias = displayAliases[snapDisp] ?? snap.targetDisplayAlias
+            let savedAlias = displayAliases[savedDisp] ?? saved.targetDisplayAlias
+            if let snapAlias = snapAlias, let savedAlias = savedAlias, !snapAlias.isEmpty, snapAlias == savedAlias {
+                return true
             }
+            return false
+        }
 
-            if let idx = matchedIndex {
-                matchedSavedIndices.insert(idx)
-                let saved = savedItems[idx]
+        // Pass 1: 标题完全匹配（无论浏览器与否，若标题一致则最精准）
+        for (snapIdx, snap) in currentSnap.enumerated() {
+            guard snapMatches[snapIdx] == nil else { continue }
+            guard let snapTitle = snap.windowTitle, !snapTitle.isEmpty else { continue }
+
+            if let savedIdx = savedItems.indices.first(where: { i in
+                !matchedSavedIndices.contains(i) &&
+                savedItems[i].bundleIdentifier == snap.bundleIdentifier &&
+                savedItems[i].profile == snap.profile &&
+                savedItems[i].windowTitle == snapTitle
+            }) {
+                matchedSavedIndices.insert(savedIdx)
+                snapMatches[snapIdx] = savedIdx
+            }
+        }
+
+        // Pass 2: 浏览器优先匹配 - 相同屏幕且相同 windowIndex
+        for (snapIdx, snap) in currentSnap.enumerated() {
+            guard snapMatches[snapIdx] == nil else { continue }
+            guard BrowserHelper.isBrowser(bundleIdentifier: snap.bundleIdentifier) else { continue }
+
+            if let savedIdx = savedItems.indices.first(where: { i in
+                !matchedSavedIndices.contains(i) &&
+                savedItems[i].bundleIdentifier == snap.bundleIdentifier &&
+                savedItems[i].profile == snap.profile &&
+                displayMatches(snap: snap, saved: savedItems[i]) &&
+                savedItems[i].windowIndex == snap.windowIndex
+            }) {
+                matchedSavedIndices.insert(savedIdx)
+                snapMatches[snapIdx] = savedIdx
+            }
+        }
+
+        // Pass 3: 浏览器匹配 - 相同屏幕，但 windowIndex 颠倒/不同（多显示器场景核心修复）
+        for (snapIdx, snap) in currentSnap.enumerated() {
+            guard snapMatches[snapIdx] == nil else { continue }
+            guard BrowserHelper.isBrowser(bundleIdentifier: snap.bundleIdentifier) else { continue }
+
+            if let savedIdx = savedItems.indices.first(where: { i in
+                !matchedSavedIndices.contains(i) &&
+                savedItems[i].bundleIdentifier == snap.bundleIdentifier &&
+                savedItems[i].profile == snap.profile &&
+                displayMatches(snap: snap, saved: savedItems[i])
+            }) {
+                matchedSavedIndices.insert(savedIdx)
+                snapMatches[snapIdx] = savedIdx
+            }
+        }
+
+        // Pass 4: 浏览器匹配 - 相同 windowIndex（单屏幕或未配置具体屏幕场景）
+        for (snapIdx, snap) in currentSnap.enumerated() {
+            guard snapMatches[snapIdx] == nil else { continue }
+            guard BrowserHelper.isBrowser(bundleIdentifier: snap.bundleIdentifier) else { continue }
+
+            if let savedIdx = savedItems.indices.first(where: { i in
+                !matchedSavedIndices.contains(i) &&
+                savedItems[i].bundleIdentifier == snap.bundleIdentifier &&
+                savedItems[i].profile == snap.profile &&
+                savedItems[i].windowIndex == snap.windowIndex
+            }) {
+                matchedSavedIndices.insert(savedIdx)
+                snapMatches[snapIdx] = savedIdx
+            }
+        }
+
+        // Pass 5: 浏览器兜底匹配 - 相同 bundleId + profile
+        for (snapIdx, snap) in currentSnap.enumerated() {
+            guard snapMatches[snapIdx] == nil else { continue }
+            guard BrowserHelper.isBrowser(bundleIdentifier: snap.bundleIdentifier) else { continue }
+
+            if let savedIdx = savedItems.indices.first(where: { i in
+                !matchedSavedIndices.contains(i) &&
+                savedItems[i].bundleIdentifier == snap.bundleIdentifier &&
+                savedItems[i].profile == snap.profile
+            }) {
+                matchedSavedIndices.insert(savedIdx)
+                snapMatches[snapIdx] = savedIdx
+            }
+        }
+
+        // Pass 6: 非浏览器窗口常规匹配 - 按 windowIndex 匹配（但若两者皆有非空标题且不相同，则拒绝匹配）
+        for (snapIdx, snap) in currentSnap.enumerated() {
+            guard snapMatches[snapIdx] == nil else { continue }
+            guard !BrowserHelper.isBrowser(bundleIdentifier: snap.bundleIdentifier) else { continue }
+
+            if let savedIdx = savedItems.indices.first(where: { i in
+                guard !matchedSavedIndices.contains(i),
+                      savedItems[i].bundleIdentifier == snap.bundleIdentifier,
+                      savedItems[i].profile == snap.profile,
+                      savedItems[i].windowIndex == snap.windowIndex else { return false }
+
+                // 若两者皆有非空标题，且不相同，则不应盲目按 index 覆盖（防止启动器和会话窗口混淆）
+                if let snapTitle = snap.windowTitle, !snapTitle.isEmpty,
+                   let savedTitle = savedItems[i].windowTitle, !savedTitle.isEmpty,
+                   snapTitle != savedTitle {
+                    return false
+                }
+                return true
+            }) {
+                matchedSavedIndices.insert(savedIdx)
+                snapMatches[snapIdx] = savedIdx
+            }
+        }
+
+        // 组装 currentSnap 结果
+        for (snapIdx, snap) in currentSnap.enumerated() {
+            if let savedIdx = snapMatches[snapIdx] {
+                let saved = savedItems[savedIdx]
                 var item = snap
                 item.isRecorded = true
                 item.relativeFrame = saved.relativeFrame
                 item.targetDisplayUUID = saved.targetDisplayUUID
-                item.targetDisplayAlias = saved.targetDisplayAlias ?? aliasMap[saved.targetDisplayUUID ?? ""]
+                item.targetDisplayAlias = saved.targetDisplayAlias ?? displayAliases[saved.targetDisplayUUID ?? ""]
                 item.targetDisplayWidth = saved.targetDisplayWidth
                 item.targetDisplayHeight = saved.targetDisplayHeight
                 item.targetDisplayIsMain = saved.targetDisplayIsMain
                 item.isFullScreen = saved.isFullScreen ?? snap.isFullScreen
                 item.isMinimized = saved.isMinimized ?? snap.isMinimized
+                // 保留 snap 当前最新的动态 windowTitle 用于界面实时显示
                 mergedItems.append(item)
             } else {
                 var item = snap
@@ -276,16 +379,17 @@ public final class AppState: ObservableObject {
             }
         }
 
+        // 追加未匹配到的预设项（未运行或未打开的窗口）
         for (i, saved) in savedItems.enumerated() {
             if !matchedSavedIndices.contains(i) {
                 var inactive = saved
                 inactive.isRecorded = true
-                inactive.targetDisplayAlias = saved.targetDisplayAlias ?? aliasMap[saved.targetDisplayUUID ?? ""]
+                inactive.targetDisplayAlias = saved.targetDisplayAlias ?? displayAliases[saved.targetDisplayUUID ?? ""]
                 mergedItems.append(inactive)
             }
         }
 
-        displayedItems = mergedItems
+        return mergedItems
     }
 
     // MARK: - Topology Operations
@@ -678,12 +782,26 @@ public final class AppState: ObservableObject {
         guard var preset = activePreset,
               let idx = config.presets.firstIndex(where: { $0.id == preset.id }) else { return }
 
+        let isBrowser = BrowserHelper.isBrowser(bundleIdentifier: item.bundleIdentifier)
         preset.items.removeAll { saved in
-            if let targetTitle = item.windowTitle, !targetTitle.isEmpty,
-               let savedTitle = saved.windowTitle, !savedTitle.isEmpty {
-                return saved.bundleIdentifier == item.bundleIdentifier &&
-                       saved.profile == item.profile &&
-                       savedTitle == targetTitle
+            if isBrowser {
+                if saved.bundleIdentifier == item.bundleIdentifier && saved.profile == item.profile {
+                    if saved.windowIndex == current.windowIndex {
+                        return true
+                    }
+                    if let curDisp = current.targetDisplayUUID, !curDisp.isEmpty,
+                       let savedDisp = saved.targetDisplayUUID, !savedDisp.isEmpty,
+                       curDisp == savedDisp {
+                        return true
+                    }
+                }
+            } else {
+                if let targetTitle = item.windowTitle, !targetTitle.isEmpty,
+                   let savedTitle = saved.windowTitle, !savedTitle.isEmpty {
+                    return saved.bundleIdentifier == item.bundleIdentifier &&
+                           saved.profile == item.profile &&
+                           savedTitle == targetTitle
+                }
             }
             return saved.id == item.id
         }
@@ -719,12 +837,26 @@ public final class AppState: ObservableObject {
         guard var preset = activePreset,
               let idx = config.presets.firstIndex(where: { $0.id == preset.id }) else { return }
 
+        let isBrowser = BrowserHelper.isBrowser(bundleIdentifier: item.bundleIdentifier)
         preset.items.removeAll { saved in
-            if let targetTitle = item.windowTitle, !targetTitle.isEmpty,
-               let savedTitle = saved.windowTitle, !savedTitle.isEmpty {
-                return saved.bundleIdentifier == item.bundleIdentifier &&
-                       saved.profile == item.profile &&
-                       savedTitle == targetTitle
+            if isBrowser {
+                if saved.bundleIdentifier == item.bundleIdentifier && saved.profile == item.profile {
+                    if saved.windowIndex == item.windowIndex {
+                        return true
+                    }
+                    if let itemDisp = item.targetDisplayUUID, !itemDisp.isEmpty,
+                       let savedDisp = saved.targetDisplayUUID, !savedDisp.isEmpty,
+                       itemDisp == savedDisp {
+                        return true
+                    }
+                }
+            } else {
+                if let targetTitle = item.windowTitle, !targetTitle.isEmpty,
+                   let savedTitle = saved.windowTitle, !savedTitle.isEmpty {
+                    return saved.bundleIdentifier == item.bundleIdentifier &&
+                           saved.profile == item.profile &&
+                           savedTitle == targetTitle
+                }
             }
             return saved.id == item.id
         }

@@ -241,4 +241,39 @@ final class PackageParsersTests: XCTestCase {
         XCTAssertEqual(rg?.latestVersion, "14.1.0")
         XCTAssertEqual(rg?.source, .cargo)
     }
+
+    func testDetectPackageUpgradedFromStreamingOutput() {
+        XCTAssertEqual(PackageParsers.detectPackageUpgraded(from: "✔︎ Bottle git (2.56.0_1)"), "git")
+        XCTAssertEqual(PackageParsers.detectPackageUpgraded(from: "✔︎ Bottle rclone (1.75.2)"), "rclone")
+        XCTAssertEqual(PackageParsers.detectPackageUpgraded(from: "✔︎ Formula opencode (1.19.2)"), "opencode")
+        XCTAssertEqual(PackageParsers.detectPackageUpgraded(from: "🍺  /opt/homebrew/Cellar/ada-url/2.7.9: 15 files, 680.1KB"), "ada-url")
+        XCTAssertEqual(PackageParsers.detectPackageUpgraded(from: "🍺  /usr/local/Cellar/simdjson/3.10.1: 20 files, 1MB"), "simdjson")
+        XCTAssertEqual(PackageParsers.detectPackageUpgraded(from: "🍺  docker-desktop was successfully installed!"), "docker-desktop")
+
+        // Negative cases
+        XCTAssertNil(PackageParsers.detectPackageUpgraded(from: "Error: Failed to download resource \"go\""))
+        XCTAssertNil(PackageParsers.detectPackageUpgraded(from: "curl: (92) HTTP/2 stream 1 was not closed cleanly: PROTOCOL_ERROR (err 1)"))
+        XCTAssertNil(PackageParsers.detectPackageUpgraded(from: "==> Fetching ada-url"))
+        XCTAssertNil(PackageParsers.detectPackageUpgraded(from: "==> Upgrading 25 outdated packages:"))
+    }
+
+    func testParseBrewListVersionsAndFormulaUpgradedCheck() {
+        let sampleOutput = """
+        git 2.56.0_1
+        opencode 1.18.35 1.19.2
+        mysql-client 26.7.0_1
+        go 1.26.0
+        """
+        let map = PackageParsers.parseBrewListVersions(output: sampleOutput)
+        XCTAssertEqual(map["git"], ["2.56.0_1"])
+        XCTAssertEqual(map["opencode"], ["1.18.35", "1.19.2"])
+        XCTAssertEqual(map["mysql-client"], ["26.7.0_1"])
+        XCTAssertEqual(map["go"], ["1.26.0"])
+
+        XCTAssertTrue(PackageParsers.isFormulaUpgraded(rawName: "git", latestVersion: "2.56.0_1", installedVersionsMap: map))
+        XCTAssertTrue(PackageParsers.isFormulaUpgraded(rawName: "anomalyco/tap/opencode", latestVersion: "1.19.2", installedVersionsMap: map))
+        XCTAssertTrue(PackageParsers.isFormulaUpgraded(rawName: "mysql-client", latestVersion: "26.7.0_1", installedVersionsMap: map))
+        XCTAssertFalse(PackageParsers.isFormulaUpgraded(rawName: "go", latestVersion: "1.27.2", installedVersionsMap: map))
+        XCTAssertFalse(PackageParsers.isFormulaUpgraded(rawName: "unknown", latestVersion: "1.0.0", installedVersionsMap: map))
+    }
 }

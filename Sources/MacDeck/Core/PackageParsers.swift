@@ -368,4 +368,55 @@ public struct PackageParsers {
         }
         return results.sorted { $0.displayName.lowercased() < $1.displayName.lowercased() }
     }
+
+    private static let bottleOrFormulaRegex = try? NSRegularExpression(
+        pattern: #"✔︎\s+(?:Bottle|Formula)\s+([a-zA-Z0-9_\-\.\@\/]+)"#
+    )
+    private static let cellarRegex = try? NSRegularExpression(
+        pattern: #"🍺\s+(?:/opt/homebrew|/usr/local)/Cellar/([a-zA-Z0-9_\-\.\@\/]+)/"#
+    )
+    private static let caskSuccessRegex = try? NSRegularExpression(
+        pattern: #"🍺\s+([a-zA-Z0-9_\-\.]+)\s+was successfully installed!"#
+    )
+
+    public static func detectPackageUpgraded(from line: String) -> String? {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let nsLine = trimmed as NSString
+        let range = NSRange(location: 0, length: nsLine.length)
+
+        if let match = bottleOrFormulaRegex?.firstMatch(in: trimmed, options: [], range: range) {
+            return nsLine.substring(with: match.range(at: 1))
+        }
+
+        if let match = cellarRegex?.firstMatch(in: trimmed, options: [], range: range) {
+            return nsLine.substring(with: match.range(at: 1))
+        }
+
+        if let match = caskSuccessRegex?.firstMatch(in: trimmed, options: [], range: range) {
+            return nsLine.substring(with: match.range(at: 1))
+        }
+
+        return nil
+    }
+
+    public static func parseBrewListVersions(output: String) -> [String: [String]] {
+        var map: [String: [String]] = [:]
+        let lines = output.components(separatedBy: .newlines)
+        for line in lines {
+            let parts = line.split(whereSeparator: \.isWhitespace).map(String.init)
+            guard parts.count >= 2 else { continue }
+            let name = parts[0]
+            let versions = Array(parts.dropFirst())
+            map[name] = versions
+        }
+        return map
+    }
+
+    public static func isFormulaUpgraded(rawName: String, latestVersion: String, installedVersionsMap: [String: [String]]) -> Bool {
+        let shortName = rawName.components(separatedBy: "/").last ?? rawName
+        let versions = installedVersionsMap[rawName] ?? installedVersionsMap[shortName] ?? []
+        return versions.contains(latestVersion)
+    }
 }
